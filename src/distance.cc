@@ -27,6 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "TriMesh.h"
 #include "KDtree.h"
 
+using namespace std;
+
+
 #if 0
 #define MAX_KD_DIST (10 * 10)
 #define HIST_SIZE 1500
@@ -64,8 +67,8 @@ point closest_on_face(const TriMesh *mesh, int i, const point &p) {
                     { a[2], b[2], n[2] } };
   float x[3] = { p1[0], p1[1], p1[2] };
   int indx[3];
-  ludcmp(A, indx);
-  lubksb(A, indx, x);
+  ludcmp<float, 3>(A, indx);
+  lubksb<float, 3>(A, indx, x);
 
   if (x[0] >= 0.0f && x[1] >= 0.0f && x[0] + x[1] <= 1.0f)
     return v0 + x[0] * a + x[1] * b;
