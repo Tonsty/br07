@@ -26,7 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+//#include <unistd.h>
+#include <windows.h>
 #include <string.h>
 #include "TriMesh.h"
 #include "TriMesh_algo.h"
@@ -86,11 +87,12 @@ void autorient(const char *filename, const VRIPxform &v, FILE *vripconf)
 	}
 
 	// Figure out the name of the .xf file
-	const char *dot = rindex(filename, '.');
+	//const char *dot = rindex(filename, '.');
+	const char *dot = strrchr(filename, '.');
 	if (!dot)
 		dot = filename + strlen(filename);
 	int l = dot - filename;
-	char xfname[l+4];
+	char *xfname = new char[l+4];
 	strncpy(xfname, filename, l);
 	xfname[l] = '.';
 	xfname[l+1] = 'x';
@@ -182,6 +184,7 @@ void autorient(const char *filename, const VRIPxform &v, FILE *vripconf)
 	fflush(vripconf);
 
 	delete mesh;
+	delete []xfname;
 }
 
 
