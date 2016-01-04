@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "EdgeMesh.h"
 #include "TriMesh_algo.h"
+using namespace std;
 
 void EdgeMesh::need_edges(int bsize) {
   if (isedge.size != 0) return;
@@ -75,7 +76,7 @@ EdgeMesh *EdgeMesh::read_preprocessed(const char *filename) {
   int numvertices, numfaces;
   bool read_faces = false, read_curve = false;
   char format[8];
-  FILE *f = !strcmp(filename, "-") ? stdin : fopen(filename, "r");
+  FILE *f = !strcmp(filename, "-") ? stdin : fopen(filename, "rb");
   if (!f) return NULL;
 
   fread(format, sizeof(char), 8, f);
