@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "EdgeMesh.h"
 #include "XForm.h"
-#include "KDtree.h"
+#include <KDtree.h>
+#include <vector>
+using namespace std;
 
 // groups all the data and settings for ICP
 // which are associated with a single mesh

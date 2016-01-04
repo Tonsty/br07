@@ -26,15 +26,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <cmath>
 #include <algorithm>
 #include <stdio.h>
+#include <math.h>
 #include "ICP.h"
 #include "KDtree.h"
 #include "timestamp.h"
 #include "lineqn.h"
+#include "rand48.h"
 using namespace std;
+
 
 #define MAX_ITERS 100
 #define MIN_PAIRS 25
-#define DESIRED_PAIRS 500
+#define DESIRED_PAIRS 100
 #define COMPAT_THRESH 0.9f
 #define CURVE_THRESH  0.99f // higher is more restrictive
 // #define CURVE_THRESH  0.0f // higher is more restrictive
@@ -45,6 +48,8 @@ using namespace std;
 // One or both of the following can be #defined
 #define USE_GRID_FOR_OVERLAPS
 #define USE_KD_FOR_OVERLAPS
+
+#define isnan(x) (!(x==x))
 
 
 // Determine whether point i is an edge point
@@ -423,7 +428,8 @@ static void compute_stable_probs(const vector<PtPair> &pairs,
   centroid1 = centroid2 = point(0,0,0);
   for (size_t i = 0; i < n; i++) {
     centroid1 += pairs[i].p1;
-    centroid2 += pairs[2].p1;
+    //centroid2 += pairs[2].p1;
+    centroid2 += pairs[i].p2;
   }
 
   centroid1 /= float(n);
@@ -467,8 +473,8 @@ static void compute_stable_probs(const vector<PtPair> &pairs,
     }
   }
 
-  eigdc(evec1, eval1);
-  eigdc(evec2, eval2);
+  eigdc<float, 6>(evec1, eval1);
+  eigdc<float, 6>(evec2, eval2);
 }
 
 
@@ -515,7 +521,7 @@ static void compute_ICPmatrix(const vector<PtPair> &pairs,
 
   err /= float(n);
   err = sqrt(err) / scale;
-  eigdc(evec, eval);
+  eigdc<float, 6>(evec, eval);
 }
 
 // Compute ICP alignment, given matrix computed by compute_ICPmatrix
@@ -530,7 +536,7 @@ static void compute_alignxf(float evec[6][6], float eval[6], float b[6],
                         einv[i] = 1.0 / eval[i];
         }
         float x[6];
-        eigmult(evec, einv, b, x);
+        eigmult<float, 6>(evec, einv, b, x);
 
         // Interpret results
         float sx = min(max(x[0], -1.0f), 1.0f);
@@ -591,7 +597,7 @@ void compute_scale(const vector<PtPair> &pairs, xform &alignxf, int verbose)
         double csqrt1[3][3] = { {1,0,0}, {0,1,0}, {0,0,1} };
         double csqrt2[3][3] = { {1,0,0}, {0,1,0}, {0,0,1} };
         double eval[3];
-        eigdc(cov1, eval);
+        eigdc<double, 3>(cov1, eval);
         for (int i = 0; i < 3; i++) {
           if (unlikely(eval[i] <= 0)) {
             alignxf = xform();
@@ -601,9 +607,9 @@ void compute_scale(const vector<PtPair> &pairs, xform &alignxf, int verbose)
           eval[i] = sqrt(eval[i] / n);
         }
         for (int i = 0; i < 3; i++)
-          eigmult(cov1, eval, csqrt1[i], csqrt1[i]);
+          eigmult<double, 3>(cov1, eval, csqrt1[i], csqrt1[i]);
 
-        eigdc(cov2, eval);
+        eigdc<double, 3>(cov2, eval);
         for (int i = 0; i < 3; i++) {
           if (unlikely(eval[i] <= 0)) {
             alignxf = xform();
@@ -613,7 +619,7 @@ void compute_scale(const vector<PtPair> &pairs, xform &alignxf, int verbose)
           eval[i] = sqrt(eval[i] / n);
         }
         for (int i = 0; i < 3; i++)
-                eigmult(cov2, eval, csqrt2[i], csqrt2[i]);
+                eigmult<double, 3>(cov2, eval, csqrt2[i], csqrt2[i]);
 
         if (verbose > 1) {
                 fprintf(stderr, "sqrt covariance 1 =");
@@ -764,7 +770,7 @@ static float ICP_iter(ICP_struct &m0, ICP_struct &m1, float &maxdist, int verbos
       float x[6];
       for (int j = 0; j < 6; j++)
         x[j] = (j == i) ? 1.0 : 0.0;
-      eigmult(evecs[idx], einv, x, x);
+      eigmult<float, 6>(evecs[idx], einv, x, x);
       for (int j = 0; j < 6; j++)
         Cinv[i][j] = x[j];
     }
@@ -1029,7 +1035,7 @@ void stable_sample(EdgeMesh *m, int npts, vector<int> &points) {
     float x[6];
     for (int j = 0; j < 6; j++)
       x[j] = (j == i) ? 1.0 : 0.0;
-    eigmult(evec, einv, x, x);
+    eigmult<float, 6>(evec, einv, x, x);
     for (int j = 0; j < 6; j++)
       Cinv[i][j] = x[j];
   }

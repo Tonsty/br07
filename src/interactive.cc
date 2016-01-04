@@ -36,8 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // #include "tps_defs.h"
 #include <GL/glut.h>
 #include "glui.h"
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES
+#endif
+#include <math.h>
+#include "rand48.h"
 #include <vector>
 using namespace std;
+
 
 // diffusion sigmas
 static float d_geom = 0;
@@ -48,10 +54,10 @@ static float d_curv = 1;
 static float max_el_factor = -1;
 
 // other parameters
-static int num_points = 500;
+static int num_points = 200;
 static float max_kd_dist = 5;
-static float gauss_dist = 20; // david; use 5 for penguin
-#define MAX_COLOR_DIST 5
+static float gauss_dist = 0.005; // david; use 5 for penguin
+#define MAX_COLOR_DIST 0.006
 
 // mouse defines
 #define LBUTTON 1<<0
@@ -158,8 +164,8 @@ static point closest_on_face(const TriMesh *mesh, int i, const point &p) {
                     { a[2], b[2], n[2] } };
   float x[3] = { p1[0], p1[1], p1[2] };
   int indx[3];
-  ludcmp(A, indx);
-  lubksb(A, indx, x);
+  ludcmp<float, 3>(A, indx);
+  lubksb<float, 3>(A, indx, x);
 
   if (x[0] >= 0.0f && x[1] >= 0.0f && x[0] + x[1] <= 1.0f)
     return v0 + x[0] * a + x[1] * b;
@@ -388,7 +394,7 @@ static void drawmesh() {
         glTranslatef(meshes[mesh_num]->vertices[vnum][0],
                      meshes[mesh_num]->vertices[vnum][1],
                      meshes[mesh_num]->vertices[vnum][2]);
-				glutSolidSphere(1.5, 10, 10);
+				glutSolidSphere(1.5 * 0.0003, 10, 10);
 				glPopMatrix();
 			}
 		}
@@ -495,7 +501,7 @@ static void do_icp(int x, int y) {
 	icp_vertex_center = v;
 
 	// do weighted icp alignment
-	float maxdist = 50;
+	float maxdist = 0.01;
 	int verbose = 2;
 
 	EdgeMesh *tgt_mesh = meshes[1];
@@ -1033,7 +1039,7 @@ int main(int argc, char *argv[]) {
   // use_indexes, do_affine
   // set true, false for FUR,
   // false, false for most other stuff
-  float icp_err = ICP(m1, m0, stability, max_stability, 15, 2,
+  float icp_err = ICP(m1, m0, stability, max_stability, 0.01, 2,
                       &points, ipairs, use_indexes, do_affine);
   // assert(out_pdf.size() == meshes[0]->vertices.size());
   if ((m0.pdf.size() != meshes[0]->vertices.size()) && (m1.pdf.size() > 0)) {
