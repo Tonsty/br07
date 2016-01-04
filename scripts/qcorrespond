@@ -15,7 +15,7 @@ for (( i=0; i < $num_scripts; i++ ))
   echo \#PBS -S /bin/bash >> $j
   echo \#PBS -l nodes=1 >> $j
   echo cd $PWD >> $j
-  echo export PATH=/e:/br07/build/bin/Release:/e:/br07/third_party/Pre-built.2/lib:\$PATH >> $j
+  echo export PATH=/e/br07/build/bin/Release:/e/br07/third_party/Pre-built.2/lib:\$PATH >> $j
 done
 
 script_num=0;
