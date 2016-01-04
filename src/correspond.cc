@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "EdgeMesh.h"
 #include "TriMesh_algo.h"
 #include "ICP.h"
+#include "rand48.h"
 
 using namespace std;
 
@@ -195,8 +196,8 @@ point closest_on_face(const EdgeMesh *mesh, int i, const point &p) {
                     { a[2], b[2], n[2] } };
   float x[3] = { p1[0], p1[1], p1[2] };
   int indx[3];
-  ludcmp(A, indx);
-  lubksb(A, indx, x);
+  ludcmp<float, 3>(A, indx);
+  lubksb<float, 3>(A, indx, x);
 
   if (x[0] >= 0.0f && x[1] >= 0.0f && x[0] + x[1] <= 1.0f)
     return v0 + x[0] * a + x[1] * b;
@@ -276,7 +277,7 @@ static void read_fname(char *fname, FILE *flist) {
 static EdgeMesh *read_mesh(char *name, bool read_xf) {
   EdgeMesh *mesh = EdgeMesh::read_preprocessed(name);
   if (!mesh) {
-    assert(mesh = EdgeMesh::read(name)); putc('\n', stderr);
+	mesh = EdgeMesh::read(name); putc('\n', stderr);
     if (mesh->normals.size() != mesh->vertices.size()) {
       mesh->normals.clear();
       mesh->need_normals();
