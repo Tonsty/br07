@@ -6,6 +6,7 @@
 # on how to do this, and on how to tweak options
 
 # This script assumes the appropriate bin directory is in your path
+export PATH=/e:/br07/build/bin/Release:/e:/br07/third_party/Pre-built.2/lib:$PATH
 
 # set up the input files and output directory
 #

@@ -1,4 +1,5 @@
 #!/bin/bash
+
 dest_dir=$1
 num_scripts=$2
 shift
@@ -14,12 +15,13 @@ for (( i=0; i < $num_scripts; i++ ))
   echo \#PBS -S /bin/bash >> $j
   echo \#PBS -l nodes=1 >> $j
   echo cd $PWD >> $j
+  echo export PATH=/e:/br07/build/bin/Release:/e:/br07/third_party/Pre-built.2/lib:\$PATH >> $j
 done
 
 script_num=0;
 for i in $(cat pre_list.txt)
   do j=$(basename $i pre)txt
   k=${dest_dir}/qsub_${script_num}.txt
-  echo \(time correspond -kd 5 $* -bbox ../bbox.dat $i pre_list.txt $sample_rate \) \> corr_$j 2\> err_$j >> $k
+  echo \(time correspond -kd 0.01 $* -bbox ../bbox.dat $i pre_list.txt $sample_rate \) \> corr_$j 2\> err_$j >> $k
   script_num=$(( ($script_num + 1) % $num_scripts ))
 done
