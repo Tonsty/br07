@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
 
   opts_t opts(argc, argv);
 
-  FILE *outfile = fopen(opts.bbox_file, "w");
+  FILE *outfile = fopen(opts.bbox_file, "wb");
 
   // this needs to be supported in opts_t
   FILE *fstable = NULL;
