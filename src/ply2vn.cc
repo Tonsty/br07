@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
-#include <GL/glut.h>
+#include <time.h>
+//#include <GL/glut.h>
 #include <assert.h>
 
 #include <vector>
@@ -40,6 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <fstream>
 
 #include <tnt_array2d.h>
+
+#include <rand48.h>
 
 #include "TriMesh.h"
 
