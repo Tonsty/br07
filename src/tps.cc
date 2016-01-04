@@ -73,7 +73,7 @@ static farr gen_Kw(const farr &x, const farr &z, const farr &w) {
   assert(nz == w.dim1());
 
   farr out(nx, w.dim2());
-  matrix_t tmp[nz];
+  matrix_t * tmp = new matrix_t[nz];
 
   for (int i = 0; i < nx; i++) {
     for (int j = 0; j < nz; j++) {
@@ -91,6 +91,9 @@ static farr gen_Kw(const farr &x, const farr &z, const farr &w) {
       }
     }
   }
+
+  delete []tmp;
+  tmp = NULL;
 
   return out;
 }

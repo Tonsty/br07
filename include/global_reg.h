@@ -105,8 +105,8 @@ struct opts_t {
   opts_t(int argc, char **argv) : write_individual_points(false), use_global_points(false),
     suppress_optimization(false), rigid_prefix(NULL), nonrigid_prefix(NULL),
     affine_prefix(NULL), camera_centers_file(NULL), correspondences_file(NULL),
-    max_allowed_err(1000), min_allowed_stability(0.001f), min_allowed_max_stability(1),
-    max_allowed_divergence(50), min_target_dist2(64), lambda(LAMBDA_INIT), nthreads(1),
+    max_allowed_err(0.01f), min_allowed_stability(0.001f), min_allowed_max_stability(1),
+    max_allowed_divergence(0.01f), min_target_dist2(0.001f), lambda(LAMBDA_INIT), nthreads(1),
     disable_pts_file(NULL), pts_file(NULL), read_xf(false), write_xf(false) {
     // we rely on default initialization of everything to false/NULL
     for (int i = 1; i < argc; i++) {
@@ -243,6 +243,25 @@ class threaded_alignment {
     TriMesh *points_mesh;
     const vector<TriMesh::Face> &all_faces;
     threaded_alignment *ta;
+
+	align_scan_struct (const opts_t &_opts = opts_t(0, NULL),
+		const vector<char *> &_mesh_names = vector<char *>(),
+		const vector<corr_vector> &_corrs = vector<corr_vector>(),
+		const vector<point> &_targets = vector<point>(),
+		const vector<bool> &_use_points = vector<bool>(),
+		const vector<float> &_confidence = vector<float>(),
+		TriMesh *_points_mesh = NULL,
+		const vector<TriMesh::Face> &_all_faces = vector<TriMesh::Face>(),
+		threaded_alignment *_ta = NULL): 
+				opts(_opts), 
+				mesh_names(_mesh_names), 
+				corrs(_corrs), 
+				targets(_targets), 
+				use_points(_use_points), 
+				confidence(_confidence), 
+				points_mesh(_points_mesh),
+				all_faces(_all_faces),
+				ta(_ta){}
   } data;
 
   static void *alignment_thread(void *data) {
@@ -277,8 +296,8 @@ class threaded_alignment {
     pthread_mutex_init(&counter_mutex, NULL);
     pthread_mutex_init(&mesh_mutex, NULL);
 
-    align_scan_struct d = { opts, mesh_names, corrs, targets, use_points,
-             confidence, points_mesh, all_faces, this };
+    align_scan_struct d = align_scan_struct( opts, mesh_names, corrs, targets, use_points,
+             confidence, points_mesh, all_faces, this );
     memcpy(&data, &d, sizeof(align_scan_struct));
 
     threads.resize(opts.nthreads);

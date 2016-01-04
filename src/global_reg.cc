@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <math.h>
 #include <time.h>
 #include <stdlib.h>
-#include <sys/time.h>
+#include <time.h>
 
 #include <string.h>
 #include <algorithm>
@@ -51,7 +51,7 @@ int pruned_points = 0, thinned_points = 0, conf_points = 0;
 // #define CONF_THRESH 0.8f
 #define CONF_THRESH -1
 // #define MAX_SPRING_LEN 500.0f
-#define MAX_SPRING_LEN 50.0f
+#define MAX_SPRING_LEN 0.025f
 // #define MIN_TARGET_DIST2 64.0f
 // #define MIN_TARGET_DIST2 8.0f // for sea floor
 
@@ -62,8 +62,8 @@ int pruned_points = 0, thinned_points = 0, conf_points = 0;
 FILE *outfile = stdout;
 
 #define MAX_RELAX_ITERS 100
-// #define MIN_RELAX_ERR    0.000000005f
-#define MIN_RELAX_ERR    0.000005f
+#define MIN_RELAX_ERR    0.0000000005f
+// #define MIN_RELAX_ERR    0.000005f
 #define MIN_RELAX_MOTION 0.005f
 
 struct input_corr {
@@ -654,10 +654,10 @@ private:
     points_mesh->faces.resize(12 * num_points);
     for (int i = 0; i < num_points; i++) {
       if (!use_points[i]) continue;
-      write_cube_vertex(&points_mesh->vertices[8 * i], orig_targets[i], 0.5f);
+      write_cube_vertex(&points_mesh->vertices[8 * i], orig_targets[i], 0.0005f);
       write_cube_face(points_mesh->faces, 12 * i, 8 * i);
     }
-    // points_mesh->write("points/orig_points.ply");
+    points_mesh->write("points/orig_points.ply");
 
     std::vector<point> camera_centers;
     if (opts.camera_centers_file) {
@@ -742,7 +742,7 @@ private:
           float len = dist(p, orig_targets[k]);
           if (len > MAX_SPRING_LEN) continue;
 
-          float wgt = 1 / (0.001f + len);
+          float wgt = 1 / (0.001f + len * 1000);
 
           // see if we have this spring already (from the other alignment direction)
           bool found_spring = false;
@@ -850,7 +850,7 @@ int main(int argc, char *argv[]) {
           if (rc.corrs[i][j].stable == false) continue;
           rc.points_mesh->vertices.resize(v + 8);
           rc.points_mesh->faces.resize(f + 12);
-          write_cube_vertex(&rc.points_mesh->vertices[v], rc.corrs[i][j].pnt, 0.5f);
+          write_cube_vertex(&rc.points_mesh->vertices[v], rc.corrs[i][j].pnt, 0.0005f);
           write_cube_face(rc.points_mesh->faces, f, v);
           v += 8; f += 12;
         }
@@ -868,7 +868,7 @@ int main(int argc, char *argv[]) {
     rc.points_mesh->faces.resize(12);
     for (int i = 0; i < rc.num_points; i++) {
       if (!rc.use_points[i]) continue;
-      write_cube_vertex(&rc.points_mesh->vertices[0], rc.targets[i], 0.5f);
+      write_cube_vertex(&rc.points_mesh->vertices[0], rc.targets[i], 0.0005f);
       write_cube_face(rc.points_mesh->faces, 0, 0);
 
       char fname[1024];
@@ -881,7 +881,7 @@ int main(int argc, char *argv[]) {
   rc.points_mesh->faces.resize(12 * rc.num_points);
   for (int i = 0; i < rc.num_points; i++) {
     if (!rc.use_points[i]) continue;
-    write_cube_vertex(&rc.points_mesh->vertices[8 * i], rc.targets[i], 0.5f);
+    write_cube_vertex(&rc.points_mesh->vertices[8 * i], rc.targets[i], 0.0005f);
     write_cube_face(rc.points_mesh->faces, 12 * i, 8 * i);
   }
   rc.points_mesh->write("points/avg_points.ply");
@@ -889,8 +889,8 @@ int main(int argc, char *argv[]) {
   timestamp opt_start = now();
 
   if (!opts.suppress_optimization) {
-    for (int i = 0; i < 100; i++) move_points(rc.targets, rc.use_points, rc.errors, rc.springs, false);
-    for (int i = 0; i < 100; i++) move_points(rc.targets, rc.use_points, rc.errors, rc.springs, true);
+    for (int i = 0; i < 1; i++) move_points(rc.targets, rc.use_points, rc.errors, rc.springs, false);
+    for (int i = 0; i < 1; i++) move_points(rc.targets, rc.use_points, rc.errors, rc.springs, true);
   }
   int f = 0;
 
@@ -913,7 +913,7 @@ int main(int argc, char *argv[]) {
     prune_big_moving_points(opts.min_target_dist2, rc.corrs[i], rc.targets, rc.use_points);
 
   if (!opts.suppress_optimization) {
-    for (int i = 0; i < 10; i++) move_points(rc.targets, rc.use_points, rc.errors, rc.springs, true);
+    for (int i = 0; i < 1; i++) move_points(rc.targets, rc.use_points, rc.errors, rc.springs, true);
   }
 #endif
   float opt_time = now() - opt_start;
@@ -953,7 +953,7 @@ int main(int argc, char *argv[]) {
   rc.points_mesh->faces.resize(12 * rc.num_points);
   for (int i = 0; i < rc.num_points; i++) {
     if (rc.use_points[i]) continue;
-    write_cube_vertex(&rc.points_mesh->vertices[8 * i], rc.targets[i], 0.5f);
+    write_cube_vertex(&rc.points_mesh->vertices[8 * i], rc.targets[i], 0.0005f);
     write_cube_face(rc.points_mesh->faces, f, 8 * i);
     f += 12;
   }
@@ -964,7 +964,7 @@ int main(int argc, char *argv[]) {
   rc.points_mesh->faces.resize(12 * rc.num_points);
   for (int i = 0; i < rc.num_points; i++) {
     if (!rc.use_points[i]) continue;
-    write_cube_vertex(&rc.points_mesh->vertices[8 * i], rc.targets[i], 0.5f);
+    write_cube_vertex(&rc.points_mesh->vertices[8 * i], rc.targets[i], 0.0005f);
     write_cube_face(rc.points_mesh->faces, f, 8 * i);
     f += 12;
   }
@@ -977,7 +977,7 @@ int main(int argc, char *argv[]) {
     rc.points_mesh->faces.resize(12);
     for (int i = 0; i < rc.num_points; i++) {
       if (!rc.use_points[i]) continue;
-      write_cube_vertex(&rc.points_mesh->vertices[0], rc.targets[i], 0.5f);
+      write_cube_vertex(&rc.points_mesh->vertices[0], rc.targets[i], 0.0005f);
       write_cube_face(rc.points_mesh->faces, 0, 0);
 
       char fname[1024];
