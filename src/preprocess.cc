@@ -30,8 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
-#include <GL/glut.h>
+#include <time.h>
+//#include <GL/glut.h>
 #include <assert.h>
 
 #include <vector>
@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "EdgeMesh.h"
 #include "TriMesh_algo.h"
 #include "ICP.h"
+#include "rand48.h"
 
 using namespace std;
 
@@ -231,7 +232,7 @@ int main(int argc, char *argv[])
       char face_header[] = { 'F', 'F', 'F', 'F', 'F', 'A', 'C', 'E' };
       char curv_header[] = { 'F', 'F', 'F', 'F', 'C', 'U', 'R', 'V' };
       read_fname(fname, stdin);
-      FILE *premesh = fopen(fname, "w");
+      FILE *premesh = fopen(fname, "wb");
       assert(premesh);
       unsigned int vsize = mesh->vertices.size();
       unsigned int fsize = mesh->faces.size();
@@ -251,7 +252,7 @@ int main(int argc, char *argv[])
         }
       }
 
-      int isedge[(vsize + 31) / 32];
+      int *isedge = new int[(vsize + 31) / 32];
       for (unsigned int i = 0; i < (vsize + 31) / 32; isedge[i++] = 0);
       for (unsigned int i = 0; i < vsize; i++) {
         int bit = (mesh->neighbors[i].size() != mesh->adjacentfaces[i].size());
@@ -260,6 +261,8 @@ int main(int argc, char *argv[])
       fwrite(isedge, 4, (vsize + 31) / 32, premesh);
       if (opts.type == opts_t::FACE) fwrite(&mesh->faces[0], sizeof(int), 3 * fsize, premesh);
       fclose(premesh);
+
+	  delete []isedge;
     }
 
     float bbox[6];
