@@ -576,48 +576,7 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 
 		vector< vector<point_pair_vector> > ppvs(num_meshes, vector<point_pair_vector>(num_meshes) );
 
-		//for (int i = 0; i < icv.size(); i++) {
-		//	if (use_points[i]) {
-		//		for (int j = 0; j < icv[i].size()-1; j++) {
-		//			if (icv[i][j].status == input_corr::STABLE) {
-		//				for(int k = j+1; k < icv[i].size(); k++) {
-		//					if (icv[i][k].status == input_corr::STABLE) {
-		//						int mesh_index_x = icv[i][j].tgt;
-		//						int mesh_index_y = icv[i][k].tgt;
-		//						point x = icv[i][j].p;
-		//						point y = icv[i][k].p;
-		//						point_pair pp(x, y);
-		//						float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-		//						if(dist < opts.max_allowed_divergence )ppvs[mesh_index_x][mesh_index_y].push_back(pp);
-		//					}
-		//				}
-		//			}
-		//		}
-		//	}
-		//}
-
 		int unused = 0, unstable = 0, unallowed = 0;
-
-		//Strategy for ApproxiMultiTPS
-		for (int i = 0; i < icv.size(); i++) {
-			if(!use_points[i]){
-				unused++;
-				continue;
-			}
-			for (int j = 0; j < icv[i].size(); j++) {
-				if (icv[i][j].status == input_corr::STABLE) {
-					int mesh_index_x = icv[i][j].tgt;
-					int mesh_index_y = icv[i][(j+1)%icv[i].size()].tgt;
-					point x = icv[i][j].p;
-					point y = icv[i][(j+1)%icv[i].size()].p;
-					float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-					if(dist < opts.max_allowed_divergence) {
-						point_pair pp(x, y);
-						ppvs[mesh_index_x][mesh_index_y].push_back(pp);
-					} else unallowed++;
-				}else unstable++;
-			}
-		}
 
 		////First strategy
 		//for (int i = 0; i < icv.size(); i++) {
@@ -645,7 +604,6 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 		//		}else unstable++;
 		//	}
 		//}
-		
 
 		////Second strategy
 		//for (int i = 0, start =0; i < icv_num_for_each.size(); i++) {
@@ -725,6 +683,49 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 		//	} else unused++;
 		//}
 
+		////Fourth strategy
+		//for (int i = 0; i < icv.size(); i++) {
+		//	if (use_points[i]) {
+		//		for (int j = 0; j < icv[i].size()-1; j++) {
+		//			if (icv[i][j].status == input_corr::STABLE) {
+		//				for(int k = j+1; k < icv[i].size(); k++) {
+		//					if (icv[i][k].status == input_corr::STABLE) {
+		//						int mesh_index_x = icv[i][j].tgt;
+		//						int mesh_index_y = icv[i][k].tgt;
+		//						point x = icv[i][j].p;
+		//						point y = icv[i][k].p;
+		//						point_pair pp(x, y);
+		//						float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+		//						if(dist < opts.max_allowed_divergence )ppvs[mesh_index_x][mesh_index_y].push_back(pp);
+		//						else unallowed++;
+		//					}
+		//				}
+		//			} else unstable++;
+		//		}
+		//	}else unused++;
+		//}
+
+		//Strategy for ApproxiMultiTPS
+		for (int i = 0; i < icv.size(); i++) {
+			if(!use_points[i]){
+				unused++;
+				continue;
+			}
+			for (int j = 0; j < icv[i].size(); j++) {
+				if (icv[i][j].status == input_corr::STABLE) {
+					int mesh_index_x = icv[i][j].tgt;
+					int mesh_index_y = icv[i][(j+1)%icv[i].size()].tgt;
+					point x = icv[i][j].p;
+					point y = icv[i][(j+1)%icv[i].size()].p;
+					float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+					if(dist < opts.max_allowed_divergence) {
+						point_pair pp(x, y);
+						ppvs[mesh_index_x][mesh_index_y].push_back(pp);
+					} else unallowed++;
+				}else unstable++;
+			}
+		}
+
 		std::cout << "unused : " << unused << std::endl;
 		std::cout << "unstable : " << unstable << std::endl;
 		std::cout << "unallowed : " << unallowed << std::endl;
@@ -737,25 +738,38 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 			std::cout << std::endl;
 		}
 
-		vector<int> alpha, beta, m;
+		vector<int> alpha, beta, m, na, nb;
 
 		int total_num_corr = 0;
 
-		int min_each_num_corr = opts.min_each_num_corr;
-		int max_each_num_corr = opts.max_each_num_corr;
+		//int min_each_num_corr = opts.min_each_num_corr;
+		//int max_each_num_corr = opts.max_each_num_corr;
+
+		//for (int i = 0; i < num_meshes-1; i++) {
+		//	for (int j = i+1; j < num_meshes; j++) {
+		//		if (!ppvs[i][j].empty() && ppvs[i][j].size() >= min_each_num_corr) {
+		//			alpha.push_back(i);
+		//			beta.push_back(j);
+		//			if (ppvs[i][j].size() <= max_each_num_corr) {
+		//				m.push_back(ppvs[i][j].size());
+		//				total_num_corr += m.back();
+		//			} else {
+		//				m.push_back(max_each_num_corr);
+		//				total_num_corr += m.back();
+		//			}	
+		//		}
+		//	}
+		//}
 
 		for (int i = 0; i < num_meshes-1; i++) {
 			for (int j = i+1; j < num_meshes; j++) {
-				if (!ppvs[i][j].empty() && ppvs[i][j].size() >= min_each_num_corr) {
+				if (!ppvs[i][j].empty() || !ppvs[j][i].empty()) {
 					alpha.push_back(i);
 					beta.push_back(j);
-					if (ppvs[i][j].size() <= max_each_num_corr) {
-						m.push_back(ppvs[i][j].size());
-						total_num_corr += m.back();
-					} else {
-						m.push_back(max_each_num_corr);
-						total_num_corr += m.back();
-					}	
+					na.push_back(ppvs[i][j].size());
+					nb.push_back(ppvs[j][i].size());
+					m.push_back(ppvs[i][j].size() + ppvs[j][i].size());
+					total_num_corr += m.back();
 				}
 			}
 		}
@@ -764,45 +778,74 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 
 		int current_num_corr = 0;
 
+		//for (int i = 0; i < num_meshes-1; i++) {
+		//	for (int j = i+1; j < num_meshes; j++) {
+		//		if (!ppvs[i][j].empty()  && ppvs[i][j].size() >= min_each_num_corr) {
+		//			if (ppvs[i][j].size() <= max_each_num_corr) {
+		//				for (int k = 0; k < ppvs[i][j].size(); k++) {
+		//					input_X(current_num_corr, 0) = ppvs[i][j][k].x[0];
+		//					input_X(current_num_corr, 1) = ppvs[i][j][k].x[1];
+		//					input_X(current_num_corr, 2) = ppvs[i][j][k].x[2];
+
+		//					input_Y(current_num_corr, 0) = ppvs[i][j][k].y[0];
+		//					input_Y(current_num_corr, 1) = ppvs[i][j][k].y[1];
+		//					input_Y(current_num_corr, 2) = ppvs[i][j][k].y[2];
+
+		//					current_num_corr++;
+		//				}
+		//			} else {
+		//				vector<int> indices(ppvs[i][j].size());
+		//				for (int i = 0; i < indices.size(); i++) {
+		//					indices[i] = i;
+		//				}
+		//				srand(time(NULL));
+		//				for (int i = indices.size()-1; i>=1; i--) {
+		//					int j = rand() % (i+1);
+		//					int temp = indices[j];
+		//					indices[j] = indices[i];
+		//					indices[i] = temp;
+		//				}
+
+		//				for (int k = 0; k < max_each_num_corr; k++) {
+		//					input_X(current_num_corr, 0) = ppvs[i][j][indices[k]].x[0];
+		//					input_X(current_num_corr, 1) = ppvs[i][j][indices[k]].x[1];
+		//					input_X(current_num_corr, 2) = ppvs[i][j][indices[k]].x[2];
+
+		//					input_Y(current_num_corr, 0) = ppvs[i][j][indices[k]].y[0];
+		//					input_Y(current_num_corr, 1) = ppvs[i][j][indices[k]].y[1];
+		//					input_Y(current_num_corr, 2) = ppvs[i][j][indices[k]].y[2];
+
+		//					current_num_corr++;
+		//				}
+		//			}
+		//		}
+		//	}
+		//}
+
 		for (int i = 0; i < num_meshes-1; i++) {
 			for (int j = i+1; j < num_meshes; j++) {
-				if (!ppvs[i][j].empty()  && ppvs[i][j].size() >= min_each_num_corr) {
-					if (ppvs[i][j].size() <= max_each_num_corr) {
-						for (int k = 0; k < ppvs[i][j].size(); k++) {
-							input_X(current_num_corr, 0) = ppvs[i][j][k].x[0];
-							input_X(current_num_corr, 1) = ppvs[i][j][k].x[1];
-							input_X(current_num_corr, 2) = ppvs[i][j][k].x[2];
+				if (!ppvs[i][j].empty()  || !ppvs[j][i].empty()) {
+					for (int k = 0; k < ppvs[i][j].size(); k++) {
+						input_X(current_num_corr, 0) = ppvs[i][j][k].x[0];
+						input_X(current_num_corr, 1) = ppvs[i][j][k].x[1];
+						input_X(current_num_corr, 2) = ppvs[i][j][k].x[2];
 
-							input_Y(current_num_corr, 0) = ppvs[i][j][k].y[0];
-							input_Y(current_num_corr, 1) = ppvs[i][j][k].y[1];
-							input_Y(current_num_corr, 2) = ppvs[i][j][k].y[2];
+						input_Y(current_num_corr, 0) = ppvs[i][j][k].y[0];
+						input_Y(current_num_corr, 1) = ppvs[i][j][k].y[1];
+						input_Y(current_num_corr, 2) = ppvs[i][j][k].y[2];
 
-							current_num_corr++;
-						}
-					} else {
-						vector<int> indices(ppvs[i][j].size());
-						for (int i = 0; i < indices.size(); i++) {
-							indices[i] = i;
-						}
-						srand(time(NULL));
-						for (int i = indices.size()-1; i>=1; i--) {
-							int j = rand() % (i+1);
-							int temp = indices[j];
-							indices[j] = indices[i];
-							indices[i] = temp;
-						}
+						current_num_corr++;
+					}
+					for (int k = 0; k < ppvs[j][i].size(); k++) {
+						input_X(current_num_corr, 0) = ppvs[j][i][k].y[0];
+						input_X(current_num_corr, 1) = ppvs[j][i][k].y[1];
+						input_X(current_num_corr, 2) = ppvs[j][i][k].y[2];
 
-						for (int k = 0; k < max_each_num_corr; k++) {
-							input_X(current_num_corr, 0) = ppvs[i][j][indices[k]].x[0];
-							input_X(current_num_corr, 1) = ppvs[i][j][indices[k]].x[1];
-							input_X(current_num_corr, 2) = ppvs[i][j][indices[k]].x[2];
+						input_Y(current_num_corr, 0) = ppvs[j][i][k].x[0];
+						input_Y(current_num_corr, 1) = ppvs[j][i][k].x[1];
+						input_Y(current_num_corr, 2) = ppvs[j][i][k].x[2];
 
-							input_Y(current_num_corr, 0) = ppvs[i][j][indices[k]].y[0];
-							input_Y(current_num_corr, 1) = ppvs[i][j][indices[k]].y[1];
-							input_Y(current_num_corr, 2) = ppvs[i][j][indices[k]].y[2];
-
-							current_num_corr++;
-						}
+						current_num_corr++;
 					}
 				}
 			}
@@ -863,7 +906,8 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 			lambda[i] = 0.00001;
 		}
 
-		gmnr::MultiTPS mtps(input_X, input_Y, m, alpha, beta, kappa, lambda, 10);
+		//gmnr::MultiTPS mtps(input_X, input_Y, m, alpha, beta, kappa, lambda, 10);
+		gmnr::ApproxiMultiTPS mtps(input_X, input_Y, m, alpha, beta, kappa, lambda, na, nb, 5);
 
 		for (int i = 0; i < num_meshes; i++) {
 			const char *mesh_name = mesh_names[i];
