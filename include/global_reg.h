@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "tps.h"
 
 #define LAMBDA_INIT    .00000001f
+#define KAPPA_INIT    .0000001f
 
 using namespace std;
 
@@ -102,12 +103,23 @@ struct opts_t {
   // write an xf instead of a ply?
   bool read_xf, write_xf;
 
+  float cube_size;
+  
+  float max_spring_len;
+  float wgt_epsilon; 
+
+  float kappa;
+
+  int min_each_num_corr;
+  int max_each_num_corr;
+
   opts_t(int argc, char **argv) : write_individual_points(false), use_global_points(false),
     suppress_optimization(false), rigid_prefix(NULL), nonrigid_prefix(NULL),
     affine_prefix(NULL), camera_centers_file(NULL), correspondences_file(NULL),
-    max_allowed_err(0.01f), min_allowed_stability(0.001f), min_allowed_max_stability(1),
-    max_allowed_divergence(0.01f), min_target_dist2(0.001f), lambda(LAMBDA_INIT), nthreads(1),
-    disable_pts_file(NULL), pts_file(NULL), read_xf(false), write_xf(false) {
+    max_allowed_err(0.6f), min_allowed_stability(0.001f), min_allowed_max_stability(1),
+    max_allowed_divergence(1.2f), min_target_dist2(2.0f), lambda(LAMBDA_INIT), nthreads(1),
+    disable_pts_file(NULL), pts_file(NULL), read_xf(false), write_xf(false), 
+	cube_size(1.0f), wgt_epsilon(1.0f), max_spring_len(5.0f), kappa(KAPPA_INIT), min_each_num_corr(30), max_each_num_corr(50) {
     // we rely on default initialization of everything to false/NULL
     for (int i = 1; i < argc; i++) {
       if (!strcmp(argv[i], "-r")) {
@@ -188,7 +200,43 @@ struct opts_t {
         // rigid and affine alignments should
         // write an xf rather than a ply
         write_xf = true;
-      } else {
+	  } else if (!strcmp(argv[i], "-max_allowed_err")) {
+		  assert(i < (argc - 1));
+		  i++;
+		  max_allowed_err = atof(argv[i]);
+	  } else if (!strcmp(argv[i], "-max_allowed_divergence")) {
+		  assert(i < (argc - 1));
+		  i++;		  
+		  max_allowed_divergence = atof(argv[i]);
+	  } else if (!strcmp(argv[i], "-cube_size")) {
+		assert(i < (argc - 1));
+		i++;		  
+		cube_size = atof(argv[i]);
+	  } else if (!strcmp(argv[i], "-wgt_epsilon")) {
+		  assert(i < (argc - 1));
+		  i++;		  
+		  wgt_epsilon = atof(argv[i]);
+	  } else if (!strcmp(argv[i], "-max_spring_len")) {
+		  assert(i < (argc - 1));
+		  i++;		  
+		  max_spring_len = atof(argv[i]);
+	  }else if (!strcmp(argv[i], "-kappa")) {
+		  // set lambda value for tps
+		  assert(i < (argc - 1));
+		  i++;
+		  kappa = atof(argv[i]);
+	  }else if (!strcmp(argv[i], "-min_each_num_corr")) {
+		  // set lambda value for tps
+		  assert(i < (argc - 1));
+		  i++;
+		  min_each_num_corr = atof(argv[i]);
+	  }else if (!strcmp(argv[i], "-max_each_num_corr")) {
+		  // set lambda value for tps
+		  assert(i < (argc - 1));
+		  i++;
+		  max_each_num_corr = atof(argv[i]);
+	  }
+	  else {
         // There should be no naked parameters
         assert(0);
 #if 0

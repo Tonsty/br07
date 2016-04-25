@@ -22,6 +22,6 @@ script_num=0;
 for i in $(cat pre_list.txt)
   do j=$(basename $i pre)txt
   k=${dest_dir}/qsub_${script_num}.txt
-  echo \(time correspond -kd 0.01 $* -bbox ../bbox.dat $i pre_list.txt $sample_rate \) \> corr_$j 2\> err_$j >> $k
+  echo \(time correspond -kd 0.0006 $* -bbox ../bbox.dat $i pre_list.txt $sample_rate \) \> corr_$j 2\> err_$j >> $k
   script_num=$(( ($script_num + 1) % $num_scripts ))
 done

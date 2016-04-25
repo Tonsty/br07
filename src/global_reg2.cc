@@ -29,6 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "timestamp.h"
 #include "KDtree.h"
 
+#include "rand48.h"
+
 #include <math.h>
 #include <time.h>
 #include <stdlib.h>
@@ -39,6 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <utility>
 #include <iostream>
 #include <fstream>
+
+#include <GMNR/MultiTPS.h>
 
 using namespace std;
 
@@ -469,46 +473,8 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
     // do TPS warp
     matrix_t lambda = opts.lambda * tps_size;
     farr A, w;
-
-	std::cout << lambda << std::endl;
-
-	fstream fs_x("viewX.xyz");
-	if (fs_x) {
-		for (int i = 0; i < x.dim1(); i++) {
-			for (int j = 0; j < x.dim2(); j++) {
-				fs_x << x[i][j] << " ";
-			}
-			fs_x << std::endl;
-		}
-		fs_x.close();
-	}
-	fstream fs_y("viewY.xyz");
-	if (fs_y) {
-		for (int i = 0; i < y.dim1(); i++) {
-			for (int j = 0; j < y.dim2(); j++) {
-				fs_y << y[i][j] << " ";
-			}
-			fs_y << std::endl;
-		}
-		fs_y.close();
-	}
     
     update_transform_mat(x, y, lambda, w, A);
-
-	farr xn = warp_points(x, x, w, A);
-
-	fstream fs_xn("viewX_new.xyz", std::ios::out);
-	if (fs_xn) {
-		for (int i = 0; i < xn.dim1(); i++) {
-			for (int j = 0; j < xn.dim2(); j++) {
-				fs_xn << xn[i][j] << " ";
-			}
-			fs_xn << std::endl;
-		}
-		fs_xn.close();
-	}
-
-	exit(0);
 
     if (opts.affine_prefix) {
       xform xfout = xform(A[0][0], A[0][1], A[0][2], A[0][3],
@@ -548,6 +514,424 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
   if (mesh) delete mesh;
 }
 
+struct point_pair{
+	point x;
+	point y;
+	point_pair(const point &x, const point &y) {
+		this->x = x;
+		this->y = y;
+	}
+};
+
+typedef vector<point_pair> point_pair_vector;
+
+void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int &num_meshes, const vector<int> &icv_num_for_each,
+	const vector<input_corr_vector> &icv, const vector<point> &targets, const vector<bool> &use_points, const vector<float> &confidence,
+	TriMesh *points_mesh, const vector<TriMesh::Face> &all_faces, pthread_mutex_t *mutex) {
+
+		//vector<point> viewX, viewY;
+
+		//for (int i = 0; i < icv.size(); i++) {
+		//	if (use_points[i]) {
+		//		for (int j = 0; j < icv[i].size(); j++) {
+		//			if (icv[i][j].status == input_corr::STABLE && icv[i][j].tgt == 0) {
+		//				point x = icv[i][j].p;
+		//				point y = targets[i];
+		//				point_pair pp(x, y);
+		//				float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+		//				if(dist < opts.max_allowed_divergence )	{
+		//					viewX.push_back(x);
+		//					viewY.push_back(y);
+		//				}				
+		//			}
+		//		}
+		//	}
+		//	
+		//}
+		//
+		//std::fstream fs_viewX("viewX.xyz", std::ios::out);
+		//if(fs_viewX) {
+		//	for(int p = 0; p < viewX.size(); p++) {
+		//		for (int q = 0; q < 3; q++) {
+		//			fs_viewX << viewX[p][q] << " ";
+		//		}
+		//		fs_viewX << std::endl;
+		//	}
+		//}
+		//fs_viewX.close();
+		//std::fstream fs_viewY("viewY.xyz", std::ios::out);
+		//if(fs_viewY) {
+		//	for(int p = 0; p < viewY.size(); p++) {
+		//		for (int q = 0; q < 3; q++) {
+		//			fs_viewY << viewY[p][q] << " ";
+		//		}
+		//		fs_viewY << std::endl;
+		//	}
+		//}
+		//fs_viewY.close();
+
+		//return;
+
+		std::cout << "original : " << icv.size() << std::endl;
+
+		vector< vector<point_pair_vector> > ppvs(num_meshes, vector<point_pair_vector>(num_meshes) );
+
+		//for (int i = 0; i < icv.size(); i++) {
+		//	if (use_points[i]) {
+		//		for (int j = 0; j < icv[i].size()-1; j++) {
+		//			if (icv[i][j].status == input_corr::STABLE) {
+		//				for(int k = j+1; k < icv[i].size(); k++) {
+		//					if (icv[i][k].status == input_corr::STABLE) {
+		//						int mesh_index_x = icv[i][j].tgt;
+		//						int mesh_index_y = icv[i][k].tgt;
+		//						point x = icv[i][j].p;
+		//						point y = icv[i][k].p;
+		//						point_pair pp(x, y);
+		//						float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+		//						if(dist < opts.max_allowed_divergence )ppvs[mesh_index_x][mesh_index_y].push_back(pp);
+		//					}
+		//				}
+		//			}
+		//		}
+		//	}
+		//}
+
+		int unused = 0, unstable = 0, unallowed = 0;
+
+		//Strategy for ApproxiMultiTPS
+		for (int i = 0; i < icv.size(); i++) {
+			if(!use_points[i]){
+				unused++;
+				continue;
+			}
+			for (int j = 0; j < icv[i].size(); j++) {
+				if (icv[i][j].status == input_corr::STABLE) {
+					int mesh_index_x = icv[i][j].tgt;
+					int mesh_index_y = icv[i][(j+1)%icv[i].size()].tgt;
+					point x = icv[i][j].p;
+					point y = icv[i][(j+1)%icv[i].size()].p;
+					float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+					if(dist < opts.max_allowed_divergence) {
+						point_pair pp(x, y);
+						ppvs[mesh_index_x][mesh_index_y].push_back(pp);
+					} else unallowed++;
+				}else unstable++;
+			}
+		}
+
+		////First strategy
+		//for (int i = 0; i < icv.size(); i++) {
+		//	if(!use_points[i]){
+		//		unused++;
+		//		continue;
+		//	}
+		//	for (int j = 0; j < icv[i].size(); j++) {
+		//		if (icv[i][j].status == input_corr::STABLE) {
+		//			int mesh_index_x = icv[i][j].tgt;
+		//			int mesh_index_y = icv[i][(j+1)%icv[i].size()].tgt;
+		//			point x = icv[i][j].p;
+		//			point y = icv[i][(j+1)%icv[i].size()].p;
+		//			float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+		//			if(dist < opts.max_allowed_divergence) {
+		//				if (mesh_index_x < mesh_index_y) {
+		//					point_pair pp(x, y);
+		//					ppvs[mesh_index_x][mesh_index_y].push_back(pp);
+		//				} 
+		//				else{
+		//					point_pair pp(y, x);
+		//					ppvs[mesh_index_y][mesh_index_x].push_back(pp);
+		//				}
+		//			} else unallowed++;
+		//		}else unstable++;
+		//	}
+		//}
+		
+
+		////Second strategy
+		//for (int i = 0, start =0; i < icv_num_for_each.size(); i++) {
+		//	for (int j = start; j - start < icv_num_for_each[i]; j++) {
+		//		if (!use_points[j]) {
+		//			unused++;
+		//			continue;
+		//		}
+		//		int mesh_index_x = i;
+		//		point x;
+		//		for (int k = 0; k < icv[j].size(); k++) {
+		//			if (icv[j][k].tgt == mesh_index_x) {
+		//				x = icv[j][k].p;
+		//				break;
+		//			}
+		//		}
+		//		for(int k = 0; k < icv[j].size(); k++) {
+		//			if(icv[j][k].tgt == mesh_index_x) continue;
+		//			if (icv[j][k].status == input_corr::STABLE) {
+		//				int mesh_index_y = icv[j][k].tgt;
+		//				point y = icv[j][k].p;
+		//				float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+		//				if(dist < opts.max_allowed_divergence ){
+		//					if (mesh_index_x < mesh_index_y) {
+		//						point_pair pp(x, y);
+		//						ppvs[mesh_index_x][mesh_index_y].push_back(pp);
+		//					} 
+		//					else{
+		//						point_pair pp(y, x);
+		//						ppvs[mesh_index_y][mesh_index_x].push_back(pp);
+		//					}
+		//				}
+		//				else unallowed ++;
+		//			}else unstable++;
+		//		}
+		//	}
+		//	start += icv_num_for_each[i];
+		//}
+
+		////Third strategy
+		//for (int i = 0; i < icv.size(); i++) {
+		//	if (use_points[i]) {
+		//		vector<int> stable_indices;
+		//		for (int j = 0; j < icv[i].size(); j++) {
+		//			if (icv[i][j].status == input_corr::STABLE) {
+		//				stable_indices.push_back(j);
+		//			} else unstable++;
+		//		}
+		//		srand(time(NULL));
+		//		for (int i = stable_indices.size()-1; i>=1; i--) {
+		//			int j = rand() % (i+1);
+		//			int temp = stable_indices[j];
+		//			stable_indices[j] = stable_indices[i];
+		//			stable_indices[i] = temp;
+		//		}
+
+		//		if (stable_indices.size() >= 2) {
+		//			for (int j = 0; j < stable_indices.size()-1; j++) {
+		//				int first = stable_indices[j];
+		//				int second = stable_indices[j+1];
+		//				int mesh_index_x = icv[i][first].tgt;
+		//				int mesh_index_y = icv[i][second].tgt;
+		//				point x = icv[i][first].p;
+		//				point y = icv[i][second].p;
+		//				float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+		//				if(dist < opts.max_allowed_divergence ){
+		//					if (mesh_index_x < mesh_index_y) {
+		//						point_pair pp(x, y);
+		//						ppvs[mesh_index_x][mesh_index_y].push_back(pp);
+		//					} else{
+		//						point_pair pp(y, x);
+		//						ppvs[mesh_index_y][mesh_index_x].push_back(pp);
+		//					}
+		//				} else unallowed ++;
+		//			}	
+		//		}
+		//	} else unused++;
+		//}
+
+		std::cout << "unused : " << unused << std::endl;
+		std::cout << "unstable : " << unstable << std::endl;
+		std::cout << "unallowed : " << unallowed << std::endl;
+
+		for (int i = 0; i < num_meshes; i++) {
+			std::cout << i << ": ";
+			for (int j = 0; j < num_meshes; j++) {
+				std::cout << ppvs[i][j].size() << " ";
+			}
+			std::cout << std::endl;
+		}
+
+		vector<int> alpha, beta, m;
+
+		int total_num_corr = 0;
+
+		int min_each_num_corr = opts.min_each_num_corr;
+		int max_each_num_corr = opts.max_each_num_corr;
+
+		for (int i = 0; i < num_meshes-1; i++) {
+			for (int j = i+1; j < num_meshes; j++) {
+				if (!ppvs[i][j].empty() && ppvs[i][j].size() >= min_each_num_corr) {
+					alpha.push_back(i);
+					beta.push_back(j);
+					if (ppvs[i][j].size() <= max_each_num_corr) {
+						m.push_back(ppvs[i][j].size());
+						total_num_corr += m.back();
+					} else {
+						m.push_back(max_each_num_corr);
+						total_num_corr += m.back();
+					}	
+				}
+			}
+		}
+
+		gmnr::PointSet3D input_X(total_num_corr, 3), input_Y(total_num_corr, 3);
+
+		int current_num_corr = 0;
+
+		for (int i = 0; i < num_meshes-1; i++) {
+			for (int j = i+1; j < num_meshes; j++) {
+				if (!ppvs[i][j].empty()  && ppvs[i][j].size() >= min_each_num_corr) {
+					if (ppvs[i][j].size() <= max_each_num_corr) {
+						for (int k = 0; k < ppvs[i][j].size(); k++) {
+							input_X(current_num_corr, 0) = ppvs[i][j][k].x[0];
+							input_X(current_num_corr, 1) = ppvs[i][j][k].x[1];
+							input_X(current_num_corr, 2) = ppvs[i][j][k].x[2];
+
+							input_Y(current_num_corr, 0) = ppvs[i][j][k].y[0];
+							input_Y(current_num_corr, 1) = ppvs[i][j][k].y[1];
+							input_Y(current_num_corr, 2) = ppvs[i][j][k].y[2];
+
+							current_num_corr++;
+						}
+					} else {
+						vector<int> indices(ppvs[i][j].size());
+						for (int i = 0; i < indices.size(); i++) {
+							indices[i] = i;
+						}
+						srand(time(NULL));
+						for (int i = indices.size()-1; i>=1; i--) {
+							int j = rand() % (i+1);
+							int temp = indices[j];
+							indices[j] = indices[i];
+							indices[i] = temp;
+						}
+
+						for (int k = 0; k < max_each_num_corr; k++) {
+							input_X(current_num_corr, 0) = ppvs[i][j][indices[k]].x[0];
+							input_X(current_num_corr, 1) = ppvs[i][j][indices[k]].x[1];
+							input_X(current_num_corr, 2) = ppvs[i][j][indices[k]].x[2];
+
+							input_Y(current_num_corr, 0) = ppvs[i][j][indices[k]].y[0];
+							input_Y(current_num_corr, 1) = ppvs[i][j][indices[k]].y[1];
+							input_Y(current_num_corr, 2) = ppvs[i][j][indices[k]].y[2];
+
+							current_num_corr++;
+						}
+					}
+				}
+			}
+		}
+
+		int start = 0;
+		for (int i = 0; i < m.size(); i++) {
+			points_mesh->vertices.resize(8 * m[i]);
+			points_mesh->faces.resize(12 * m[i]);
+			for (int j = 0; j  < m[i]; j++) {
+				point p;
+				p[0] = input_X(j + start, 0);
+				p[1] = input_X(j + start, 1);
+				p[2] = input_X(j + start, 2);
+				write_cube_vertex(&points_mesh->vertices[8 * j], p, opts.cube_size);
+				write_cube_face(points_mesh->faces, 12 * j, 8 * j);
+			}
+			char points_name[1024];
+			sprintf(points_name, "points/points_%d-(%d_%d)_(%s_%s)_%d.ply", i, alpha[i], beta[i], get_mesh_name(mesh_names[alpha[i]]), get_mesh_name(mesh_names[beta[i]]), 1);
+			points_mesh->write(points_name);
+			start += m[i];
+		}
+
+		start = 0;
+		for (int i = 0; i < m.size(); i++) {
+			points_mesh->vertices.resize(8 * m[i]);
+			points_mesh->faces.resize(12 * m[i]);
+			for (int j = 0; j < m[i]; j++) {
+				point p;
+				p[0] = input_Y(j + start, 0);
+				p[1] = input_Y(j + start, 1);
+				p[2] = input_Y(j + start, 2);
+				write_cube_vertex(&points_mesh->vertices[8 * j], p, opts.cube_size);
+				write_cube_face(points_mesh->faces, 12 * j, 8 * j);
+			}
+			char points_name[1024];
+			sprintf(points_name, "points/points_%d-(%d_%d)_(%s_%s)_%d.ply", i, alpha[i], beta[i], get_mesh_name(mesh_names[alpha[i]]), get_mesh_name(mesh_names[beta[i]]), 2);
+			points_mesh->write(points_name);
+			start += m[i];
+		}
+
+		vector<int> corr_for_each_view(num_meshes, 0);
+		int total_num = 0;
+		for (int i = 0; i < m.size(); i++) {
+			corr_for_each_view[alpha[i]] += m[i];
+			corr_for_each_view[beta[i]] += m[i];
+			total_num += m[i];
+		}
+
+		gmnr::Vector kappa(num_meshes);
+		for (int i = 0; i < num_meshes; i++) {
+			//kappa[i] = opts.kappa * corr_for_each_view[i] * 1.0 / total_num;
+			kappa[i] = 0.0001;
+		}
+		gmnr::Vector lambda(num_meshes);
+		for (int i = 0; i < num_meshes; i++) {
+			//lambda[i] = opts.lambda * corr_for_each_view[i] * 1.0 / total_num;
+			lambda[i] = 0.00001;
+		}
+
+		gmnr::MultiTPS mtps(input_X, input_Y, m, alpha, beta, kappa, lambda, 10);
+
+		for (int i = 0; i < num_meshes; i++) {
+			const char *mesh_name = mesh_names[i];
+
+			fprintf(stderr, "Opening %s\n", mesh_name);
+
+			xform xfin;
+			if (opts.read_xf) {
+				// the assumes the mesh has a three-letter extension
+				char xfname[1024];
+				strcpy(xfname, mesh_name);
+				strcpy(xfname + strlen(xfname) - 3, "xf");
+				xfin.read(xfname);
+				fprintf(stderr, "Read %s:\n", xfname);
+				std::cerr << xfin;
+			}
+			TriMesh *mesh = NULL;
+
+			if (opts.nonrigid_prefix || !opts.write_xf) {
+				mesh = TriMesh::read(mesh_name);
+				mesh->normals.clear();
+				assert(mesh);
+			}
+
+			char out_name[1024]; // mesh name for output
+
+			// make a backup of the mesh vertices, because the
+			// various warps will clobber them
+			farr verts;
+			if (mesh) {
+				verts = farr(mesh->vertices.size(), 3);
+				for (unsigned int j = 0; j < mesh->vertices.size(); j++) {
+					point p = xfin * mesh->vertices[j];
+					for (int k = 0; k < 3; k++) verts[j][k] =  p[k];
+				}
+			}
+
+			if (opts.nonrigid_prefix) {
+				// do TPS warp
+
+				gmnr::TPSFunction f = mtps.getfs()[i];
+				
+				gmnr::PointSet3D original_points(mesh->vertices.size(), 3);
+				for (int j = 0; j < mesh->vertices.size(); j++) {
+					original_points(j, 0) = verts[j][0];
+					original_points(j, 1) = verts[j][1];
+					original_points(j, 2) = verts[j][2];
+				}
+				
+				gmnr::PointSet3D new_points = f.evaluate(original_points);
+
+				if (opts.nonrigid_prefix) {
+
+					for (unsigned int j = 0; j < mesh->vertices.size(); j++) {
+						mesh->vertices[j][0] = new_points(j, 0);
+						mesh->vertices[j][1] = new_points(j, 1);
+						mesh->vertices[j][2] = new_points(j, 2);
+					}
+
+					sprintf(out_name, "%s%s", opts.nonrigid_prefix, get_mesh_name(mesh_name));
+					mesh->write(out_name);
+				}
+			}
+
+			if (mesh) delete mesh;
+		}
+}
+
 class read_corrs {
 public:
   read_corrs(const opts_t &o) : opts(o) {
@@ -569,6 +953,9 @@ public:
 
   vector<char *> mesh_names;
   TriMesh *points_mesh;
+
+  vector<input_corr_vector> icv;
+  vector<int> icv_num_for_each;
 
 private:
   const opts_t &opts;
@@ -594,7 +981,6 @@ private:
       corr_files.push_back(strdup(fname));
     }
 
-    vector<input_corr_vector> icv;
     offsets.resize(num_meshes + 1);
 
     // process each source in turn
@@ -616,6 +1002,8 @@ private:
       while (offset_num < num_meshes && strcmp(mesh_name, mesh_names[offset_num])) offset_num++;
       assert(offset_num < num_meshes); // true if source is also a target
       offsets[offset_num + 1] = num_scan_points;
+
+	  icv_num_for_each.push_back(num_scan_points);
 
       // read in the list of correspondeces for this source
       for (int j = 0; j < num_scan_points; j++, num_points++) {
@@ -933,7 +1321,7 @@ int main(int argc, char *argv[]) {
   int f = 0;
 
 #if 1
-  thin_points(opts.min_target_dist2, rc.targets, rc.use_points, rc.errors, rc.springs);
+  thin_points(opts.min_target_dist2, rc.orig_targets, rc.use_points, rc.errors, rc.springs);
 
   f = 0;
   rc.points_mesh->faces.resize(12 * rc.num_points);
@@ -1060,8 +1448,7 @@ int main(int argc, char *argv[]) {
 
   // do alignment
   if (opts.nthreads == 1) {
-    for (int i = 0; i < rc.num_meshes; i++)
-      align_scan(opts, rc.mesh_names[i], rc.corrs[i], rc.targets, rc.use_points, rc.confidence, rc.points_mesh, all_faces, NULL);
+	align_scan2(opts, rc.mesh_names, rc.num_meshes, rc.icv_num_for_each, rc.icv, rc.targets, rc.use_points, rc.confidence, rc.points_mesh, all_faces, NULL);
   } else {
     // multithreaded version
     threaded_alignment ta(opts, rc.mesh_names, rc.corrs, rc.targets, rc.use_points, rc.confidence, rc.points_mesh, all_faces);

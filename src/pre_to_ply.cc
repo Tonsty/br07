@@ -60,6 +60,10 @@ int main(int argc, char *argv[])
 
   const char *fname = (argc > 1) ? argv[1] : "-";
 
-  EdgeMesh *mesh = EdgeMesh::read_preprocessed(argv[1]);
-  mesh->write(fname);
+  EdgeMesh *mesh = EdgeMesh::read(fname);
+
+  char outname[1024];
+  sprintf(outname, "%s.ply", fname);
+
+  mesh->write(outname);
 }

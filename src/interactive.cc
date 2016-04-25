@@ -42,6 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <math.h>
 #include "rand48.h"
 #include <vector>
+
+#include <pcl/io/pcd_io.h>
+
 using namespace std;
 
 
@@ -54,10 +57,12 @@ static float d_curv = 1;
 static float max_el_factor = -1;
 
 // other parameters
-static int num_points = 200;
-static float max_kd_dist = 5;
-static float gauss_dist = 0.005; // david; use 5 for penguin
+static int num_points = 100;
+static float max_kd_dist = 10;
+static float gauss_dist = 15; // david; use 5 for penguin
 #define MAX_COLOR_DIST 0.006
+
+//pcl::PointCloud<pcl::Boundary> cloud[2];
 
 // mouse defines
 #define LBUTTON 1<<0
@@ -207,7 +212,7 @@ static int closest_pt(const TriMesh *mesh, const KDtree *kd, float mdist, const 
 
   const vector<int> &a = mesh->adjacentfaces[ind];
   if (a.empty()) {
-    fprintf(stderr, "Found match to unconnected point\n");
+    //fprintf(stderr, "Found match to unconnected point\n");
     out =  mesh->vertices[ind];
     return ind;
   }
@@ -318,9 +323,30 @@ static void drawmesh() {
 			glEnableClientState(GL_COLOR_ARRAY);
 			glColorPointer(3, GL_FLOAT, 0, &draw_colors[mesh_num][0]);
 		} else {
-      glEnable(GL_LIGHTING);
-      glDisableClientState(GL_COLOR_ARRAY);
+			glEnable(GL_LIGHTING);
+			glDisableClientState(GL_COLOR_ARRAY);
 			glColor3f(mesh_num == 0, mesh_num == 2, mesh_num == 1);
+
+			// nice peach color
+			float r = 244 / 255.0;
+			float g = 211 / 255.0;
+			float b = 153 / 255.0;
+			switch (mesh_num)
+			{
+			case 0:
+				{
+					glColor3f(r, g, b);
+					break;
+				}
+			case 1:
+				{
+					glColor3f(b, g, r);
+					break;
+				}
+			case 2:{ break;}
+			}
+			
+
 		}
 
 		glPolygonOffset(1.0f, 1.0f);
@@ -372,7 +398,7 @@ static void drawmesh() {
 			glPushMatrix();
 			const point &c = meshes[0]->vertices[icp_vertex_center];
 			glTranslatef(c[0], c[1], c[2]);
-			glColor3f(1, 1, 1);
+			glColor3f(1, 1, 0);
 			glutSolidSphere(5.0 * feature_size, 10, 10);
 			glPopMatrix();
 		}
@@ -380,7 +406,8 @@ static void drawmesh() {
 		// draw selected points for optimization
 		if (mesh_num <= 1 && draw_icp_points) {
       while (point_colors.size() < ipairs.size())
-        point_colors.push_back(point(drand48(), drand48(), drand48()));
+        //point_colors.push_back(point(drand48(), drand48(), drand48()));
+		point_colors.push_back(point(141/255.0, 75/255.0, 187/255.0));
 
 			for (unsigned int i = 0; i < ipairs.size(); i++) {
 				glPushMatrix();
@@ -394,7 +421,7 @@ static void drawmesh() {
         glTranslatef(meshes[mesh_num]->vertices[vnum][0],
                      meshes[mesh_num]->vertices[vnum][1],
                      meshes[mesh_num]->vertices[vnum][2]);
-				glutSolidSphere(1.5 * 0.0003, 10, 10);
+				glutSolidSphere(1.5 * feature_size, 10, 10);
 				glPopMatrix();
 			}
 		}
@@ -501,7 +528,7 @@ static void do_icp(int x, int y) {
 	icp_vertex_center = v;
 
 	// do weighted icp alignment
-	float maxdist = 0.01;
+	float maxdist = max_kd_dist * feature_size;
 	int verbose = 2;
 
 	EdgeMesh *tgt_mesh = meshes[1];
@@ -521,11 +548,11 @@ static void do_icp(int x, int y) {
   // can compute proper PDFs
   const point &p = meshes[0]->vertices[icp_vertex_center];
 	point psrc = p;
-	const float *tmp = src_kd->closest_to_pt(p, sqr(gauss_dist));
+	const float *tmp = src_kd->closest_to_pt(p, sqr(gauss_dist * feature_size));
 	if (tmp)
 		psrc = point(tmp);
 	point ptgt = p;
-	tmp = tgt_kd->closest_to_pt(p, sqr(gauss_dist));
+	tmp = tgt_kd->closest_to_pt(p, sqr(gauss_dist * feature_size));
 	if (tmp)
 		ptgt = point(tmp);
 
@@ -535,7 +562,7 @@ static void do_icp(int x, int y) {
 			continue;
 		const point &q = tgt_mesh->vertices[j];
 		float sqdist = dist2(ptgt, q);
-		tgt_icp.weights[j] = WEIGHT_SCALE / (sqr(gauss_dist) + sqdist);
+		tgt_icp.weights[j] = WEIGHT_SCALE / (sqr(gauss_dist * feature_size) + sqdist);
 	}
 
 	for (size_t j = 0; j < src_mesh->vertices.size(); j++) {
@@ -543,7 +570,7 @@ static void do_icp(int x, int y) {
 			continue;
 		const point &q = src_mesh->vertices[j];
 		float sqdist = dist2(psrc, q);
-		src_icp.weights[j] = WEIGHT_SCALE / (sqr(gauss_dist) + sqdist);
+		src_icp.weights[j] = WEIGHT_SCALE / (sqr(gauss_dist * feature_size) + sqdist);
 	}
 
   float stability, max_stability;
@@ -582,6 +609,8 @@ static void do_icp(int x, int y) {
       point q;
       int idx = closest_pt(mesh_num == 1 ? meshes[0] : meshes[1], kd, sqr(MAX_COLOR_DIST), p, q);
       dists[mesh_num][i].cur = (idx > 0) ? dist(p, q) / MAX_COLOR_DIST : -1;
+	  if(idx > 0 && meshes[!mesh_num]->isedge(idx) ) dists[mesh_num][i].cur = -1;
+	  //if(idx>0 && cloud[!mesh_num][idx].boundary_point ) dists[0][i].cur = dists[0][i].orig = dists[2][i].cur = dists[2][i].orig = -1;
       dists[mesh_num][i].stability = m.pdf.empty() ? 0 : m.pdf[i] / max_stability;
     }
   }
@@ -988,6 +1017,36 @@ int main(int argc, char *argv[]) {
 	if (argc < 2)
 		usage(argv[0]);
 
+	string fboundary[2];
+	fboundary[0].assign(fmesh[0]);
+	fboundary[1].assign(fmesh[1]);
+
+	int flength[2];
+	flength[0] = fboundary[0].length();
+	flength[1] = fboundary[1].length();
+
+	fboundary[0][flength[0]-3] = 'b';
+	fboundary[0][flength[0]-2] = 'd';
+	fboundary[0].resize(flength[0]-1);
+
+	fboundary[1][flength[1]-3] = 'b';
+	fboundary[1][flength[1]-2] = 'd';
+	fboundary[1].resize(flength[1]-1);
+
+ //   pcl::PCDReader reader1;
+ //   if (reader1.read(fboundary[0], cloud[0]) != 0) //* load the file
+ //   {
+ //      PCL_ERROR ("Couldn't read file %s \n", argv[1]);
+ //      return (-1);
+ //   }
+ //   
+	//pcl::PCDReader reader2;
+ //   if (reader2.read(fboundary[1], cloud[1]) != 0) //* load the file
+ //   {
+ //      PCL_ERROR ("Couldn't read file %s \n", argv[2]);
+ //      return (-1);
+ //   }
+
   EdgeMesh::set_verbose(0);
   read_meshes(fmesh, res);
 
@@ -1039,7 +1098,7 @@ int main(int argc, char *argv[]) {
   // use_indexes, do_affine
   // set true, false for FUR,
   // false, false for most other stuff
-  float icp_err = ICP(m1, m0, stability, max_stability, 0.01, 2,
+  float icp_err = ICP(m1, m0, stability, max_stability, max_kd_dist * feature_size, 2,
                       &points, ipairs, use_indexes, do_affine);
   // assert(out_pdf.size() == meshes[0]->vertices.size());
   if ((m0.pdf.size() != meshes[0]->vertices.size()) && (m1.pdf.size() > 0)) {
@@ -1077,6 +1136,8 @@ int main(int argc, char *argv[]) {
     int idx = closest_pt(meshes[1], tgt_kd, sqr(MAX_COLOR_DIST), meshes[0]->vertices[i], p);
     dists[0][i].cur = dists[0][i].orig = dists[2][i].cur = dists[2][i].orig =
       idx > 0 ? dist(meshes[0]->vertices[i], p) / MAX_COLOR_DIST : -1;
+	if(idx>0 && meshes[1]->isedge(idx)) dists[0][i].cur = dists[0][i].orig = dists[2][i].cur = dists[2][i].orig = -1;
+	//if(idx>0 && cloud[1][idx].boundary_point && dists[0][i].cur > 0.2) dists[0][i].cur = dists[0][i].orig = dists[2][i].cur = dists[2][i].orig = -1;
   }
 
   for (unsigned int i = 0; i < meshes[1]->vertices.size(); i++) {
@@ -1084,6 +1145,8 @@ int main(int argc, char *argv[]) {
     int idx = closest_pt(meshes[0], src_kd, sqr(MAX_COLOR_DIST), meshes[1]->vertices[i], p);
     dists[1][i].cur = dists[1][i].orig =
       idx > 0 ? dist(meshes[1]->vertices[i], point(p)) / MAX_COLOR_DIST : -1;
+	if(idx > 0 && meshes[0]->isedge(idx)) dists[1][i].cur = dists[1][i].orig = -1;
+	//if(idx > 0 && cloud[0][idx].boundary_point && dists[1][i].cur > 0.2) dists[1][i].cur = dists[1][i].orig = -1;
   }
 
   // update dists array with stability and curvature info

@@ -463,7 +463,7 @@ int main(int argc, char *argv[]) {
 
     ICP_struct src_icp(src_mesh, xform::identity(), src_kd, false);
 
-    float maxdist = 15.0f;
+    float maxdist = opts.kd;
     int verbose = 0;
 
     // Unweighted ICP to initialize things.  Fills in weights based
