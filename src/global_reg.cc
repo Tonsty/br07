@@ -335,7 +335,7 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
   // we have many correspondences listed, but some are unstable, so we
   // need to build a list of usable points; We also keep track of the number
   // of unstable points so we can reject scans if there are too many of them
-  int real_tps_size = 0, unstable_corrs = 0;;
+  int real_tps_size = 0, unstable_corrs = 0, unused = 0;
   points_mesh->faces.resize(12 * tps_size); // to write cubes around each point
 
   for (int j = 0; j < tps_size; j++, real_tps_size++) {
@@ -349,6 +349,7 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
       continue;
     } else if ((confidence[tgt] < CONF_THRESH) || (use_points[tgt] == false) || !corrs[j].stable) {
       // Throw out any other points we can't use.
+	  unused++;
       real_tps_size--;
       continue;
     }
@@ -379,6 +380,10 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
     float dist = SQ(x[l][0] - y[l][0]) + SQ(x[l][1] - y[l][1]) + SQ(x[l][2] - y[l][2]);
     if (dist > 500) fprintf(stderr, "Big Move! (%s)\n", mesh_name);
   }
+
+  std::cout << "Original size : "<< tps_size << std::endl;
+  std::cout << "Unused size : "<< unused << std::endl;
+  std::cout << "Unstable size : "<< unstable_corrs << std::endl;
 
   fprintf(stderr, "Real TPS size: %d, unstable_corrs: %d\n", real_tps_size, unstable_corrs);
 
@@ -472,7 +477,7 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
 
 	std::cout << lambda << std::endl;
 
-	fstream fs_x("viewX.xyz");
+	fstream fs_x("viewX.xyz", std::ios::out);
 	if (fs_x) {
 		for (int i = 0; i < x.dim1(); i++) {
 			for (int j = 0; j < x.dim2(); j++) {
@@ -482,7 +487,7 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
 		}
 		fs_x.close();
 	}
-	fstream fs_y("viewY.xyz");
+	fstream fs_y("viewY.xyz", std::ios::out);
 	if (fs_y) {
 		for (int i = 0; i < y.dim1(); i++) {
 			for (int j = 0; j < y.dim2(); j++) {

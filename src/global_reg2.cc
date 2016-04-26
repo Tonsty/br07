@@ -548,7 +548,7 @@ void icv2ppvs_ApproxiMultiTPS(const opts_t &opts, const int &num_meshes, const v
 					point x = icv[i][j].p;
 					point y = icv[i][(j+1)%icv[i].size()].p;
 					float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-					if(dist < opts.max_allowed_divergence) {
+					if(dist < 500) {
 						point_pair pp(x, y);
 						ppvs[mesh_index_x][mesh_index_y].push_back(pp);
 					} else unallowed++;
@@ -592,7 +592,7 @@ void icv2ppvs_1(const opts_t &opts, const int &num_meshes, const vector<input_co
 				point x = icv[i][j].p;
 				point y = icv[i][(j+1)%icv[i].size()].p;
 				float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-				if(dist < opts.max_allowed_divergence) {
+				if(dist < 500) {
 					if (mesh_index_x < mesh_index_y) {
 						point_pair pp(x, y);
 						ppvs[mesh_index_x][mesh_index_y].push_back(pp);
@@ -650,7 +650,7 @@ void icv2ppvs_2(const opts_t &opts, const int &num_meshes, const vector<int> &ic
 						int mesh_index_y = icv[j][k].tgt;
 						point y = icv[j][k].p;
 						float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-						if(dist < opts.max_allowed_divergence ){
+						if(dist < 500 ){
 							if (mesh_index_x < mesh_index_y) {
 								point_pair pp(x, y);
 								ppvs[mesh_index_x][mesh_index_y].push_back(pp);
@@ -716,7 +716,7 @@ void icv2ppvs_3(const opts_t &opts, const int &num_meshes, const vector<input_co
 						point x = icv[i][first].p;
 						point y = icv[i][second].p;
 						float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-						if(dist < opts.max_allowed_divergence ){
+						if(dist < 500 ){
 							if (mesh_index_x < mesh_index_y) {
 								point_pair pp(x, y);
 								ppvs[mesh_index_x][mesh_index_y].push_back(pp);
@@ -765,7 +765,7 @@ void icv2ppvs_4(const opts_t &opts, const int &num_meshes, const vector<input_co
 								point x = icv[i][j].p;
 								point y = icv[i][k].p;
 								float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-								if(dist < opts.max_allowed_divergence ) {
+								if(dist < 500 ) {
 									if (mesh_index_x < mesh_index_y) {
 										point_pair pp(x, y);
 										ppvs[mesh_index_x][mesh_index_y].push_back(pp);
@@ -933,52 +933,109 @@ void ppvs2XY_1234(const opts_t &opts, const int &num_meshes, const vector< vecto
 		}
 }
 
+void write_cube_for_XY(const opts_t &opts, const vector<char *> &mesh_names, TriMesh *points_mesh,
+	const gmnr::PointSet3D &input_X, const gmnr::PointSet3D &input_Y, const vector<int> &m, const vector<int> &alpha, const vector<int> &beta) {
+	int start = 0;
+	for (int i = 0; i < m.size(); i++) {
+		points_mesh->vertices.resize(8 * m[i]);
+		points_mesh->faces.resize(12 * m[i]);
+		for (int j = 0; j  < m[i]; j++) {
+			point p;
+			p[0] = input_X(j + start, 0);
+			p[1] = input_X(j + start, 1);
+			p[2] = input_X(j + start, 2);
+			write_cube_vertex(&points_mesh->vertices[8 * j], p, opts.cube_size);
+			write_cube_face(points_mesh->faces, 12 * j, 8 * j);
+		}
+		char points_name[1024];
+		sprintf(points_name, "points/points_%d-(%d_%d)_(%s_%s)_%d.ply", i, alpha[i], beta[i], get_mesh_name(mesh_names[alpha[i]]), get_mesh_name(mesh_names[beta[i]]), 1);
+		points_mesh->write(points_name);
+		start += m[i];
+	}
+
+	start = 0;
+	for (int i = 0; i < m.size(); i++) {
+		points_mesh->vertices.resize(8 * m[i]);
+		points_mesh->faces.resize(12 * m[i]);
+		for (int j = 0; j < m[i]; j++) {
+			point p;
+			p[0] = input_Y(j + start, 0);
+			p[1] = input_Y(j + start, 1);
+			p[2] = input_Y(j + start, 2);
+			write_cube_vertex(&points_mesh->vertices[8 * j], p, opts.cube_size);
+			write_cube_face(points_mesh->faces, 12 * j, 8 * j);
+		}
+		char points_name[1024];
+		sprintf(points_name, "points/points_%d-(%d_%d)_(%s_%s)_%d.ply", i, alpha[i], beta[i], get_mesh_name(mesh_names[alpha[i]]), get_mesh_name(mesh_names[beta[i]]), 2);
+		points_mesh->write(points_name);
+		start += m[i];
+	}
+}
+
+void write_view0_target0_xyz(const opts_t &opts, const vector<input_corr_vector> &icv, const vector<point> &targets, const vector<bool> &use_points) {
+	vector<point> viewX, viewY;
+
+	int orignial_size = 0;
+	int unused = 0;
+	int unstable = 0;
+
+	for (int i = 0; i < icv.size(); i++) {
+		for (int j = 0; j < icv[i].size(); j++){ 
+			if(icv[i][j].tgt == 0) {
+				orignial_size++;
+				if(icv[i][j].status == input_corr::STABLE) {if(!use_points[i]) unused++;}
+				else unstable++;
+			}
+		}
+		if (use_points[i]) {
+			for (int j = 0; j < icv[i].size(); j++) {
+				if (icv[i][j].status == input_corr::STABLE && icv[i][j].tgt == 0) {
+					point x = icv[i][j].p;
+					point y = targets[i];
+					point_pair pp(x, y);
+					float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+					if(dist < 500 )	{
+						viewX.push_back(x);
+						viewY.push_back(y);
+					}				
+				}
+			}
+		}
+	}
+
+	std::cout << "Original size : "<< orignial_size << std::endl;
+	std::cout << "Unused size : "<< unused << std::endl;
+	std::cout << "Unstable size : "<< unstable << std::endl;
+
+	std::fstream fs_viewX("viewX2.xyz", std::ios::out);
+	if(fs_viewX) {
+		for(int p = 0; p < viewX.size(); p++) {
+			for (int q = 0; q < 3; q++) {
+				fs_viewX << viewX[p][q] << " ";
+			}
+			fs_viewX << std::endl;
+		}
+	}
+	fs_viewX.close();
+	std::fstream fs_viewY("viewY2.xyz", std::ios::out);
+	if(fs_viewY) {
+		for(int p = 0; p < viewY.size(); p++) {
+			for (int q = 0; q < 3; q++) {
+				fs_viewY << viewY[p][q] << " ";
+			}
+			fs_viewY << std::endl;
+		}
+	}
+	fs_viewY.close();
+
+	exit(0);
+}
+
 void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int &num_meshes, const vector<int> &icv_num_for_each,
 	const vector<input_corr_vector> &icv, const vector<point> &targets, const vector<bool> &use_points, const vector<float> &confidence,
 	TriMesh *points_mesh, const vector<TriMesh::Face> &all_faces, pthread_mutex_t *mutex) {
 
-		//vector<point> viewX, viewY;
-
-		//for (int i = 0; i < icv.size(); i++) {
-		//	if (use_points[i]) {
-		//		for (int j = 0; j < icv[i].size(); j++) {
-		//			if (icv[i][j].status == input_corr::STABLE && icv[i][j].tgt == 0) {
-		//				point x = icv[i][j].p;
-		//				point y = targets[i];
-		//				point_pair pp(x, y);
-		//				float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-		//				if(dist < opts.max_allowed_divergence )	{
-		//					viewX.push_back(x);
-		//					viewY.push_back(y);
-		//				}				
-		//			}
-		//		}
-		//	}
-		//	
-		//}
-		//
-		//std::fstream fs_viewX("viewX.xyz", std::ios::out);
-		//if(fs_viewX) {
-		//	for(int p = 0; p < viewX.size(); p++) {
-		//		for (int q = 0; q < 3; q++) {
-		//			fs_viewX << viewX[p][q] << " ";
-		//		}
-		//		fs_viewX << std::endl;
-		//	}
-		//}
-		//fs_viewX.close();
-		//std::fstream fs_viewY("viewY.xyz", std::ios::out);
-		//if(fs_viewY) {
-		//	for(int p = 0; p < viewY.size(); p++) {
-		//		for (int q = 0; q < 3; q++) {
-		//			fs_viewY << viewY[p][q] << " ";
-		//		}
-		//		fs_viewY << std::endl;
-		//	}
-		//}
-		//fs_viewY.close();
-
-		//return;
+		write_view0_target0_xyz(opts, icv, targets, use_points);
 
 		vector< vector<point_pair_vector> > ppvs;
 		icv2ppvs_ApproxiMultiTPS(opts, num_meshes, icv, use_points, ppvs);
@@ -990,41 +1047,7 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 		gmnr::PointSet3D input_X, input_Y;
 		ppvs2XY_ApproxiMultiTPS(opts, num_meshes, ppvs, total_num_corr, input_X, input_Y);
 
-		int start = 0;
-		for (int i = 0; i < m.size(); i++) {
-			points_mesh->vertices.resize(8 * m[i]);
-			points_mesh->faces.resize(12 * m[i]);
-			for (int j = 0; j  < m[i]; j++) {
-				point p;
-				p[0] = input_X(j + start, 0);
-				p[1] = input_X(j + start, 1);
-				p[2] = input_X(j + start, 2);
-				write_cube_vertex(&points_mesh->vertices[8 * j], p, opts.cube_size);
-				write_cube_face(points_mesh->faces, 12 * j, 8 * j);
-			}
-			char points_name[1024];
-			sprintf(points_name, "points/points_%d-(%d_%d)_(%s_%s)_%d.ply", i, alpha[i], beta[i], get_mesh_name(mesh_names[alpha[i]]), get_mesh_name(mesh_names[beta[i]]), 1);
-			points_mesh->write(points_name);
-			start += m[i];
-		}
-
-		start = 0;
-		for (int i = 0; i < m.size(); i++) {
-			points_mesh->vertices.resize(8 * m[i]);
-			points_mesh->faces.resize(12 * m[i]);
-			for (int j = 0; j < m[i]; j++) {
-				point p;
-				p[0] = input_Y(j + start, 0);
-				p[1] = input_Y(j + start, 1);
-				p[2] = input_Y(j + start, 2);
-				write_cube_vertex(&points_mesh->vertices[8 * j], p, opts.cube_size);
-				write_cube_face(points_mesh->faces, 12 * j, 8 * j);
-			}
-			char points_name[1024];
-			sprintf(points_name, "points/points_%d-(%d_%d)_(%s_%s)_%d.ply", i, alpha[i], beta[i], get_mesh_name(mesh_names[alpha[i]]), get_mesh_name(mesh_names[beta[i]]), 2);
-			points_mesh->write(points_name);
-			start += m[i];
-		}
+		write_cube_for_XY(opts, mesh_names, points_mesh, input_X, input_Y, m, alpha, beta);
 
 		vector<int> corr_for_each_view(num_meshes, 0);
 		int total_num = 0;
@@ -1309,6 +1332,7 @@ private:
         if (divergence > opts.max_allowed_divergence) {
           fprintf(stderr, "Bad correspondence?: %4d -> %4d (%d), %.3f %.3f %.3f -> %.3f %.3f %.3f\n",
                   i, icv[i][j].tgt, src_i, ot[0], ot[1], ot[2], p[0], p[1], p[2]);
+		  icv[i][j].status = input_corr::UNSTABLE;
           stable = false;
           unstable_corrs++;
           continue;
@@ -1504,7 +1528,7 @@ int main(int argc, char *argv[]) {
   int f = 0;
 
 #if 1
-  thin_points(opts.min_target_dist2, rc.orig_targets, rc.use_points, rc.errors, rc.springs);
+  thin_points(opts.min_target_dist2, rc.targets, rc.use_points, rc.errors, rc.springs);
 
   f = 0;
   rc.points_mesh->faces.resize(12 * rc.num_points);
