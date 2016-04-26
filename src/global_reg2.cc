@@ -525,6 +525,414 @@ struct point_pair{
 
 typedef vector<point_pair> point_pair_vector;
 
+//The strategy for ApproxiMultiTPS
+void icv2ppvs_ApproxiMultiTPS(const opts_t &opts, const int &num_meshes, const vector<input_corr_vector> &icv, const vector<bool> &use_points,
+	vector< vector<point_pair_vector> > &ppvs) {
+
+		std::cout << "original : " << icv.size() << std::endl;
+
+		ppvs.resize(num_meshes, vector<point_pair_vector>(num_meshes));
+
+		int unused = 0, unstable = 0, unallowed = 0;
+
+		//The strategy for ApproxiMultiTPS
+		for (int i = 0; i < icv.size(); i++) {
+			if(!use_points[i]){
+				unused++;
+				continue;
+			}
+			for (int j = 0; j < icv[i].size(); j++) {
+				if (icv[i][j].status == input_corr::STABLE) {
+					int mesh_index_x = icv[i][j].tgt;
+					int mesh_index_y = icv[i][(j+1)%icv[i].size()].tgt;
+					point x = icv[i][j].p;
+					point y = icv[i][(j+1)%icv[i].size()].p;
+					float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+					if(dist < opts.max_allowed_divergence) {
+						point_pair pp(x, y);
+						ppvs[mesh_index_x][mesh_index_y].push_back(pp);
+					} else unallowed++;
+				}else unstable++;
+			}
+		}
+
+		std::cout << "unused : " << unused << std::endl;
+		std::cout << "unstable : " << unstable << std::endl;
+		std::cout << "unallowed : " << unallowed << std::endl;
+
+		for (int i = 0; i < num_meshes; i++) {
+			std::cout << i << ": ";
+			for (int j = 0; j < num_meshes; j++) {
+				std::cout << ppvs[i][j].size() << " ";
+			}
+			std::cout << std::endl;
+		}
+}
+
+//The first strategy
+void icv2ppvs_1(const opts_t &opts, const int &num_meshes, const vector<input_corr_vector> &icv, const vector<bool> &use_points,
+	vector< vector<point_pair_vector> > &ppvs) {
+
+    std::cout << "original : " << icv.size() << std::endl;
+
+	ppvs.resize(num_meshes, vector<point_pair_vector>(num_meshes));
+
+	int unused = 0, unstable = 0, unallowed = 0;
+
+	//The first strategy
+	for (int i = 0; i < icv.size(); i++) {
+		if(!use_points[i]){
+			unused++;
+			continue;
+		}
+		for (int j = 0; j < icv[i].size(); j++) {
+			if (icv[i][j].status == input_corr::STABLE) {
+				int mesh_index_x = icv[i][j].tgt;
+				int mesh_index_y = icv[i][(j+1)%icv[i].size()].tgt;
+				point x = icv[i][j].p;
+				point y = icv[i][(j+1)%icv[i].size()].p;
+				float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+				if(dist < opts.max_allowed_divergence) {
+					if (mesh_index_x < mesh_index_y) {
+						point_pair pp(x, y);
+						ppvs[mesh_index_x][mesh_index_y].push_back(pp);
+					} 
+					else{
+						point_pair pp(y, x);
+						ppvs[mesh_index_y][mesh_index_x].push_back(pp);
+					}
+				} else unallowed++;
+			}else unstable++;
+		}
+	}
+
+	std::cout << "unused : " << unused << std::endl;
+	std::cout << "unstable : " << unstable << std::endl;
+	std::cout << "unallowed : " << unallowed << std::endl;
+
+	for (int i = 0; i < num_meshes; i++) {
+		std::cout << i << ": ";
+		for (int j = 0; j < num_meshes; j++) {
+			std::cout << ppvs[i][j].size() << " ";
+		}
+		std::cout << std::endl;
+	}
+}
+
+//The second strategy
+void icv2ppvs_2(const opts_t &opts, const int &num_meshes, const vector<int> &icv_num_for_each, const vector<input_corr_vector> &icv, const vector<bool> &use_points,
+	vector< vector<point_pair_vector> > &ppvs) {
+
+		std::cout << "original : " << icv.size() << std::endl;
+
+		ppvs.resize(num_meshes, vector<point_pair_vector>(num_meshes));
+
+		int unused = 0, unstable = 0, unallowed = 0;
+
+		//The second strategy
+		for (int i = 0, start =0; i < icv_num_for_each.size(); i++) {
+			for (int j = start; j - start < icv_num_for_each[i]; j++) {
+				if (!use_points[j]) {
+					unused++;
+					continue;
+				}
+				int mesh_index_x = i;
+				point x;
+				for (int k = 0; k < icv[j].size(); k++) {
+					if (icv[j][k].tgt == mesh_index_x) {
+						x = icv[j][k].p;
+						break;
+					}
+				}
+				for(int k = 0; k < icv[j].size(); k++) {
+					if(icv[j][k].tgt == mesh_index_x) continue;
+					if (icv[j][k].status == input_corr::STABLE) {
+						int mesh_index_y = icv[j][k].tgt;
+						point y = icv[j][k].p;
+						float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+						if(dist < opts.max_allowed_divergence ){
+							if (mesh_index_x < mesh_index_y) {
+								point_pair pp(x, y);
+								ppvs[mesh_index_x][mesh_index_y].push_back(pp);
+							} 
+							else{
+								point_pair pp(y, x);
+								ppvs[mesh_index_y][mesh_index_x].push_back(pp);
+							}
+						}
+						else unallowed ++;
+					}else unstable++;
+				}
+			}
+			start += icv_num_for_each[i];
+		}
+
+		std::cout << "unused : " << unused << std::endl;
+		std::cout << "unstable : " << unstable << std::endl;
+		std::cout << "unallowed : " << unallowed << std::endl;
+
+		for (int i = 0; i < num_meshes; i++) {
+			std::cout << i << ": ";
+			for (int j = 0; j < num_meshes; j++) {
+				std::cout << ppvs[i][j].size() << " ";
+			}
+			std::cout << std::endl;
+		}
+}
+
+//The third strategy
+void icv2ppvs_3(const opts_t &opts, const int &num_meshes, const vector<input_corr_vector> &icv, const vector<bool> &use_points,
+	vector< vector<point_pair_vector> > &ppvs) {
+
+		std::cout << "original : " << icv.size() << std::endl;
+
+		ppvs.resize(num_meshes, vector<point_pair_vector>(num_meshes));
+
+		int unused = 0, unstable = 0, unallowed = 0;
+
+		//The third strategy
+		for (int i = 0; i < icv.size(); i++) {
+			if (use_points[i]) {
+				vector<int> stable_indices;
+				for (int j = 0; j < icv[i].size(); j++) {
+					if (icv[i][j].status == input_corr::STABLE) {
+						stable_indices.push_back(j);
+					} else unstable++;
+				}
+				srand(time(NULL));
+				for (int i = stable_indices.size()-1; i>=1; i--) {
+					int j = rand() % (i+1);
+					int temp = stable_indices[j];
+					stable_indices[j] = stable_indices[i];
+					stable_indices[i] = temp;
+				}
+
+				if (stable_indices.size() >= 2) {
+					for (int j = 0; j < stable_indices.size()-1; j++) {
+						int first = stable_indices[j];
+						int second = stable_indices[j+1];
+						int mesh_index_x = icv[i][first].tgt;
+						int mesh_index_y = icv[i][second].tgt;
+						point x = icv[i][first].p;
+						point y = icv[i][second].p;
+						float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+						if(dist < opts.max_allowed_divergence ){
+							if (mesh_index_x < mesh_index_y) {
+								point_pair pp(x, y);
+								ppvs[mesh_index_x][mesh_index_y].push_back(pp);
+							} else{
+								point_pair pp(y, x);
+								ppvs[mesh_index_y][mesh_index_x].push_back(pp);
+							}
+						} else unallowed ++;
+					}	
+				}
+			} else unused++;
+		}
+
+		std::cout << "unused : " << unused << std::endl;
+		std::cout << "unstable : " << unstable << std::endl;
+		std::cout << "unallowed : " << unallowed << std::endl;
+
+		for (int i = 0; i < num_meshes; i++) {
+			std::cout << i << ": ";
+			for (int j = 0; j < num_meshes; j++) {
+				std::cout << ppvs[i][j].size() << " ";
+			}
+			std::cout << std::endl;
+		}
+}
+
+//The fourth strategy
+void icv2ppvs_4(const opts_t &opts, const int &num_meshes, const vector<input_corr_vector> &icv, const vector<bool> &use_points,
+	vector< vector<point_pair_vector> > &ppvs) {
+
+		std::cout << "original : " << icv.size() << std::endl;
+
+		ppvs.resize(num_meshes, vector<point_pair_vector>(num_meshes));
+
+		int unused = 0, unstable = 0, unallowed = 0;
+
+		//Fourth strategy
+		for (int i = 0; i < icv.size(); i++) {
+			if (use_points[i]) {
+				for (int j = 0; j < icv[i].size()-1; j++) {
+					if (icv[i][j].status == input_corr::STABLE) {
+						for(int k = j+1; k < icv[i].size(); k++) {
+							if (icv[i][k].status == input_corr::STABLE) {
+								int mesh_index_x = icv[i][j].tgt;
+								int mesh_index_y = icv[i][k].tgt;
+								point x = icv[i][j].p;
+								point y = icv[i][k].p;
+								float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+								if(dist < opts.max_allowed_divergence ) {
+									if (mesh_index_x < mesh_index_y) {
+										point_pair pp(x, y);
+										ppvs[mesh_index_x][mesh_index_y].push_back(pp);
+									} else{
+										point_pair pp(y, x);
+										ppvs[mesh_index_y][mesh_index_x].push_back(pp);
+									}
+								}
+								else unallowed++;
+							}
+						}
+					} else unstable++;
+				}
+			}else unused++;
+		}
+
+		std::cout << "unused : " << unused << std::endl;
+		std::cout << "unstable : " << unstable << std::endl;
+		std::cout << "unallowed : " << unallowed << std::endl;
+
+		for (int i = 0; i < num_meshes; i++) {
+			std::cout << i << ": ";
+			for (int j = 0; j < num_meshes; j++) {
+				std::cout << ppvs[i][j].size() << " ";
+			}
+			std::cout << std::endl;
+		}
+}
+
+void generate_alpha_beta_m_na_nb_total_num_corr_ApproxiMultiTPS(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs,
+	vector<int> &alpha, vector<int> &beta, vector<int> &m, vector<int> &na, vector<int> &nb, int &total_num_corr) {
+		
+	total_num_corr = 0;
+
+	for (int i = 0; i < num_meshes-1; i++) {
+		for (int j = i+1; j < num_meshes; j++) {
+			if (!ppvs[i][j].empty() || !ppvs[j][i].empty()) {
+				alpha.push_back(i);
+				beta.push_back(j);
+				na.push_back(ppvs[i][j].size());
+				nb.push_back(ppvs[j][i].size());
+				m.push_back(ppvs[i][j].size() + ppvs[j][i].size());
+				total_num_corr += m.back();
+			}
+		}
+	}
+}
+
+void generate_alpha_beta_m_na_nb_total_num_corr_1234(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs,
+	vector<int> &alpha, vector<int> &beta, vector<int> &m, vector<int> &na, vector<int> &nb, int &total_num_corr) {
+
+		total_num_corr = 0;
+
+		int min_each_num_corr = opts.min_each_num_corr;
+		int max_each_num_corr = opts.max_each_num_corr;
+
+		for (int i = 0; i < num_meshes-1; i++) {
+			for (int j = i+1; j < num_meshes; j++) {
+				if (!ppvs[i][j].empty() && ppvs[i][j].size() >= min_each_num_corr) {
+					alpha.push_back(i);
+					beta.push_back(j);
+					if (ppvs[i][j].size() <= max_each_num_corr) {
+						m.push_back(ppvs[i][j].size());
+						total_num_corr += m.back();
+					} else {
+						m.push_back(max_each_num_corr);
+						total_num_corr += m.back();
+					}	
+				}
+			}
+		}
+}
+
+void ppvs2XY_ApproxiMultiTPS(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs, const int &total_num_corr,
+	gmnr::PointSet3D &input_X, gmnr::PointSet3D &input_Y) {
+
+	input_X.resize(total_num_corr, 3);
+	input_Y.resize(total_num_corr, 3);
+
+	int current_num_corr = 0;
+
+	for (int i = 0; i < num_meshes-1; i++) {
+		for (int j = i+1; j < num_meshes; j++) {
+			if (!ppvs[i][j].empty()  || !ppvs[j][i].empty()) {
+				for (int k = 0; k < ppvs[i][j].size(); k++) {
+					input_X(current_num_corr, 0) = ppvs[i][j][k].x[0];
+					input_X(current_num_corr, 1) = ppvs[i][j][k].x[1];
+					input_X(current_num_corr, 2) = ppvs[i][j][k].x[2];
+
+					input_Y(current_num_corr, 0) = ppvs[i][j][k].y[0];
+					input_Y(current_num_corr, 1) = ppvs[i][j][k].y[1];
+					input_Y(current_num_corr, 2) = ppvs[i][j][k].y[2];
+
+					current_num_corr++;
+				}
+				for (int k = 0; k < ppvs[j][i].size(); k++) {
+					input_X(current_num_corr, 0) = ppvs[j][i][k].y[0];
+					input_X(current_num_corr, 1) = ppvs[j][i][k].y[1];
+					input_X(current_num_corr, 2) = ppvs[j][i][k].y[2];
+
+					input_Y(current_num_corr, 0) = ppvs[j][i][k].x[0];
+					input_Y(current_num_corr, 1) = ppvs[j][i][k].x[1];
+					input_Y(current_num_corr, 2) = ppvs[j][i][k].x[2];
+
+					current_num_corr++;
+				}
+			}
+		}
+	}
+}
+
+void ppvs2XY_1234(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs, const int &total_num_corr,
+	gmnr::PointSet3D &input_X, gmnr::PointSet3D &input_Y) {
+
+		int min_each_num_corr = opts.min_each_num_corr;
+		int max_each_num_corr = opts.max_each_num_corr;
+
+		input_X.resize(total_num_corr, 3);
+		input_Y.resize(total_num_corr, 3);
+
+		int current_num_corr = 0;
+
+		for (int i = 0; i < num_meshes-1; i++) {
+			for (int j = i+1; j < num_meshes; j++) {
+				if (!ppvs[i][j].empty()  && ppvs[i][j].size() >= min_each_num_corr) {
+					if (ppvs[i][j].size() <= max_each_num_corr) {
+						for (int k = 0; k < ppvs[i][j].size(); k++) {
+							input_X(current_num_corr, 0) = ppvs[i][j][k].x[0];
+							input_X(current_num_corr, 1) = ppvs[i][j][k].x[1];
+							input_X(current_num_corr, 2) = ppvs[i][j][k].x[2];
+
+							input_Y(current_num_corr, 0) = ppvs[i][j][k].y[0];
+							input_Y(current_num_corr, 1) = ppvs[i][j][k].y[1];
+							input_Y(current_num_corr, 2) = ppvs[i][j][k].y[2];
+
+							current_num_corr++;
+						}
+					} else {
+						vector<int> indices(ppvs[i][j].size());
+						for (int i = 0; i < indices.size(); i++) {
+							indices[i] = i;
+						}
+						srand(time(NULL));
+						for (int i = indices.size()-1; i>=1; i--) {
+							int j = rand() % (i+1);
+							int temp = indices[j];
+							indices[j] = indices[i];
+							indices[i] = temp;
+						}
+
+						for (int k = 0; k < max_each_num_corr; k++) {
+							input_X(current_num_corr, 0) = ppvs[i][j][indices[k]].x[0];
+							input_X(current_num_corr, 1) = ppvs[i][j][indices[k]].x[1];
+							input_X(current_num_corr, 2) = ppvs[i][j][indices[k]].x[2];
+
+							input_Y(current_num_corr, 0) = ppvs[i][j][indices[k]].y[0];
+							input_Y(current_num_corr, 1) = ppvs[i][j][indices[k]].y[1];
+							input_Y(current_num_corr, 2) = ppvs[i][j][indices[k]].y[2];
+
+							current_num_corr++;
+						}
+					}
+				}
+			}
+		}
+}
+
 void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int &num_meshes, const vector<int> &icv_num_for_each,
 	const vector<input_corr_vector> &icv, const vector<point> &targets, const vector<bool> &use_points, const vector<float> &confidence,
 	TriMesh *points_mesh, const vector<TriMesh::Face> &all_faces, pthread_mutex_t *mutex) {
@@ -572,284 +980,15 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 
 		//return;
 
-		std::cout << "original : " << icv.size() << std::endl;
-
-		vector< vector<point_pair_vector> > ppvs(num_meshes, vector<point_pair_vector>(num_meshes) );
-
-		int unused = 0, unstable = 0, unallowed = 0;
-
-		////First strategy
-		//for (int i = 0; i < icv.size(); i++) {
-		//	if(!use_points[i]){
-		//		unused++;
-		//		continue;
-		//	}
-		//	for (int j = 0; j < icv[i].size(); j++) {
-		//		if (icv[i][j].status == input_corr::STABLE) {
-		//			int mesh_index_x = icv[i][j].tgt;
-		//			int mesh_index_y = icv[i][(j+1)%icv[i].size()].tgt;
-		//			point x = icv[i][j].p;
-		//			point y = icv[i][(j+1)%icv[i].size()].p;
-		//			float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-		//			if(dist < opts.max_allowed_divergence) {
-		//				if (mesh_index_x < mesh_index_y) {
-		//					point_pair pp(x, y);
-		//					ppvs[mesh_index_x][mesh_index_y].push_back(pp);
-		//				} 
-		//				else{
-		//					point_pair pp(y, x);
-		//					ppvs[mesh_index_y][mesh_index_x].push_back(pp);
-		//				}
-		//			} else unallowed++;
-		//		}else unstable++;
-		//	}
-		//}
-
-		////Second strategy
-		//for (int i = 0, start =0; i < icv_num_for_each.size(); i++) {
-		//	for (int j = start; j - start < icv_num_for_each[i]; j++) {
-		//		if (!use_points[j]) {
-		//			unused++;
-		//			continue;
-		//		}
-		//		int mesh_index_x = i;
-		//		point x;
-		//		for (int k = 0; k < icv[j].size(); k++) {
-		//			if (icv[j][k].tgt == mesh_index_x) {
-		//				x = icv[j][k].p;
-		//				break;
-		//			}
-		//		}
-		//		for(int k = 0; k < icv[j].size(); k++) {
-		//			if(icv[j][k].tgt == mesh_index_x) continue;
-		//			if (icv[j][k].status == input_corr::STABLE) {
-		//				int mesh_index_y = icv[j][k].tgt;
-		//				point y = icv[j][k].p;
-		//				float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-		//				if(dist < opts.max_allowed_divergence ){
-		//					if (mesh_index_x < mesh_index_y) {
-		//						point_pair pp(x, y);
-		//						ppvs[mesh_index_x][mesh_index_y].push_back(pp);
-		//					} 
-		//					else{
-		//						point_pair pp(y, x);
-		//						ppvs[mesh_index_y][mesh_index_x].push_back(pp);
-		//					}
-		//				}
-		//				else unallowed ++;
-		//			}else unstable++;
-		//		}
-		//	}
-		//	start += icv_num_for_each[i];
-		//}
-
-		////Third strategy
-		//for (int i = 0; i < icv.size(); i++) {
-		//	if (use_points[i]) {
-		//		vector<int> stable_indices;
-		//		for (int j = 0; j < icv[i].size(); j++) {
-		//			if (icv[i][j].status == input_corr::STABLE) {
-		//				stable_indices.push_back(j);
-		//			} else unstable++;
-		//		}
-		//		srand(time(NULL));
-		//		for (int i = stable_indices.size()-1; i>=1; i--) {
-		//			int j = rand() % (i+1);
-		//			int temp = stable_indices[j];
-		//			stable_indices[j] = stable_indices[i];
-		//			stable_indices[i] = temp;
-		//		}
-
-		//		if (stable_indices.size() >= 2) {
-		//			for (int j = 0; j < stable_indices.size()-1; j++) {
-		//				int first = stable_indices[j];
-		//				int second = stable_indices[j+1];
-		//				int mesh_index_x = icv[i][first].tgt;
-		//				int mesh_index_y = icv[i][second].tgt;
-		//				point x = icv[i][first].p;
-		//				point y = icv[i][second].p;
-		//				float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-		//				if(dist < opts.max_allowed_divergence ){
-		//					if (mesh_index_x < mesh_index_y) {
-		//						point_pair pp(x, y);
-		//						ppvs[mesh_index_x][mesh_index_y].push_back(pp);
-		//					} else{
-		//						point_pair pp(y, x);
-		//						ppvs[mesh_index_y][mesh_index_x].push_back(pp);
-		//					}
-		//				} else unallowed ++;
-		//			}	
-		//		}
-		//	} else unused++;
-		//}
-
-		////Fourth strategy
-		//for (int i = 0; i < icv.size(); i++) {
-		//	if (use_points[i]) {
-		//		for (int j = 0; j < icv[i].size()-1; j++) {
-		//			if (icv[i][j].status == input_corr::STABLE) {
-		//				for(int k = j+1; k < icv[i].size(); k++) {
-		//					if (icv[i][k].status == input_corr::STABLE) {
-		//						int mesh_index_x = icv[i][j].tgt;
-		//						int mesh_index_y = icv[i][k].tgt;
-		//						point x = icv[i][j].p;
-		//						point y = icv[i][k].p;
-		//						point_pair pp(x, y);
-		//						float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-		//						if(dist < opts.max_allowed_divergence )ppvs[mesh_index_x][mesh_index_y].push_back(pp);
-		//						else unallowed++;
-		//					}
-		//				}
-		//			} else unstable++;
-		//		}
-		//	}else unused++;
-		//}
-
-		//Strategy for ApproxiMultiTPS
-		for (int i = 0; i < icv.size(); i++) {
-			if(!use_points[i]){
-				unused++;
-				continue;
-			}
-			for (int j = 0; j < icv[i].size(); j++) {
-				if (icv[i][j].status == input_corr::STABLE) {
-					int mesh_index_x = icv[i][j].tgt;
-					int mesh_index_y = icv[i][(j+1)%icv[i].size()].tgt;
-					point x = icv[i][j].p;
-					point y = icv[i][(j+1)%icv[i].size()].p;
-					float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
-					if(dist < opts.max_allowed_divergence) {
-						point_pair pp(x, y);
-						ppvs[mesh_index_x][mesh_index_y].push_back(pp);
-					} else unallowed++;
-				}else unstable++;
-			}
-		}
-
-		std::cout << "unused : " << unused << std::endl;
-		std::cout << "unstable : " << unstable << std::endl;
-		std::cout << "unallowed : " << unallowed << std::endl;
-
-		for (int i = 0; i < num_meshes; i++) {
-			std::cout << i << ": ";
-			for (int j = 0; j < num_meshes; j++) {
-				std::cout << ppvs[i][j].size() << " ";
-			}
-			std::cout << std::endl;
-		}
+		vector< vector<point_pair_vector> > ppvs;
+		icv2ppvs_ApproxiMultiTPS(opts, num_meshes, icv, use_points, ppvs);
 
 		vector<int> alpha, beta, m, na, nb;
-
 		int total_num_corr = 0;
+		generate_alpha_beta_m_na_nb_total_num_corr_ApproxiMultiTPS(opts, num_meshes, ppvs, alpha, beta, m, na, nb, total_num_corr);
 
-		//int min_each_num_corr = opts.min_each_num_corr;
-		//int max_each_num_corr = opts.max_each_num_corr;
-
-		//for (int i = 0; i < num_meshes-1; i++) {
-		//	for (int j = i+1; j < num_meshes; j++) {
-		//		if (!ppvs[i][j].empty() && ppvs[i][j].size() >= min_each_num_corr) {
-		//			alpha.push_back(i);
-		//			beta.push_back(j);
-		//			if (ppvs[i][j].size() <= max_each_num_corr) {
-		//				m.push_back(ppvs[i][j].size());
-		//				total_num_corr += m.back();
-		//			} else {
-		//				m.push_back(max_each_num_corr);
-		//				total_num_corr += m.back();
-		//			}	
-		//		}
-		//	}
-		//}
-
-		for (int i = 0; i < num_meshes-1; i++) {
-			for (int j = i+1; j < num_meshes; j++) {
-				if (!ppvs[i][j].empty() || !ppvs[j][i].empty()) {
-					alpha.push_back(i);
-					beta.push_back(j);
-					na.push_back(ppvs[i][j].size());
-					nb.push_back(ppvs[j][i].size());
-					m.push_back(ppvs[i][j].size() + ppvs[j][i].size());
-					total_num_corr += m.back();
-				}
-			}
-		}
-
-		gmnr::PointSet3D input_X(total_num_corr, 3), input_Y(total_num_corr, 3);
-
-		int current_num_corr = 0;
-
-		//for (int i = 0; i < num_meshes-1; i++) {
-		//	for (int j = i+1; j < num_meshes; j++) {
-		//		if (!ppvs[i][j].empty()  && ppvs[i][j].size() >= min_each_num_corr) {
-		//			if (ppvs[i][j].size() <= max_each_num_corr) {
-		//				for (int k = 0; k < ppvs[i][j].size(); k++) {
-		//					input_X(current_num_corr, 0) = ppvs[i][j][k].x[0];
-		//					input_X(current_num_corr, 1) = ppvs[i][j][k].x[1];
-		//					input_X(current_num_corr, 2) = ppvs[i][j][k].x[2];
-
-		//					input_Y(current_num_corr, 0) = ppvs[i][j][k].y[0];
-		//					input_Y(current_num_corr, 1) = ppvs[i][j][k].y[1];
-		//					input_Y(current_num_corr, 2) = ppvs[i][j][k].y[2];
-
-		//					current_num_corr++;
-		//				}
-		//			} else {
-		//				vector<int> indices(ppvs[i][j].size());
-		//				for (int i = 0; i < indices.size(); i++) {
-		//					indices[i] = i;
-		//				}
-		//				srand(time(NULL));
-		//				for (int i = indices.size()-1; i>=1; i--) {
-		//					int j = rand() % (i+1);
-		//					int temp = indices[j];
-		//					indices[j] = indices[i];
-		//					indices[i] = temp;
-		//				}
-
-		//				for (int k = 0; k < max_each_num_corr; k++) {
-		//					input_X(current_num_corr, 0) = ppvs[i][j][indices[k]].x[0];
-		//					input_X(current_num_corr, 1) = ppvs[i][j][indices[k]].x[1];
-		//					input_X(current_num_corr, 2) = ppvs[i][j][indices[k]].x[2];
-
-		//					input_Y(current_num_corr, 0) = ppvs[i][j][indices[k]].y[0];
-		//					input_Y(current_num_corr, 1) = ppvs[i][j][indices[k]].y[1];
-		//					input_Y(current_num_corr, 2) = ppvs[i][j][indices[k]].y[2];
-
-		//					current_num_corr++;
-		//				}
-		//			}
-		//		}
-		//	}
-		//}
-
-		for (int i = 0; i < num_meshes-1; i++) {
-			for (int j = i+1; j < num_meshes; j++) {
-				if (!ppvs[i][j].empty()  || !ppvs[j][i].empty()) {
-					for (int k = 0; k < ppvs[i][j].size(); k++) {
-						input_X(current_num_corr, 0) = ppvs[i][j][k].x[0];
-						input_X(current_num_corr, 1) = ppvs[i][j][k].x[1];
-						input_X(current_num_corr, 2) = ppvs[i][j][k].x[2];
-
-						input_Y(current_num_corr, 0) = ppvs[i][j][k].y[0];
-						input_Y(current_num_corr, 1) = ppvs[i][j][k].y[1];
-						input_Y(current_num_corr, 2) = ppvs[i][j][k].y[2];
-
-						current_num_corr++;
-					}
-					for (int k = 0; k < ppvs[j][i].size(); k++) {
-						input_X(current_num_corr, 0) = ppvs[j][i][k].y[0];
-						input_X(current_num_corr, 1) = ppvs[j][i][k].y[1];
-						input_X(current_num_corr, 2) = ppvs[j][i][k].y[2];
-
-						input_Y(current_num_corr, 0) = ppvs[j][i][k].x[0];
-						input_Y(current_num_corr, 1) = ppvs[j][i][k].x[1];
-						input_Y(current_num_corr, 2) = ppvs[j][i][k].x[2];
-
-						current_num_corr++;
-					}
-				}
-			}
-		}
+		gmnr::PointSet3D input_X, input_Y;
+		ppvs2XY_ApproxiMultiTPS(opts, num_meshes, ppvs, total_num_corr, input_X, input_Y);
 
 		int start = 0;
 		for (int i = 0; i < m.size(); i++) {
@@ -907,7 +1046,7 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 		}
 
 		//gmnr::MultiTPS mtps(input_X, input_Y, m, alpha, beta, kappa, lambda, 10);
-		gmnr::ApproxiMultiTPS mtps(input_X, input_Y, m, alpha, beta, kappa, lambda, na, nb, 5);
+		gmnr::ApproxiMultiTPS mtps(input_X, input_Y, m, alpha, beta, kappa, lambda, na, nb, 4);
 
 		for (int i = 0; i < num_meshes; i++) {
 			const char *mesh_name = mesh_names[i];
