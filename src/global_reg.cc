@@ -475,45 +475,45 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
     matrix_t lambda = opts.lambda * tps_size;
     farr A, w;
 
-	std::cout << lambda << std::endl;
+	std::cout << mesh_name << " : lambda = " << lambda << std::endl;
 
-	fstream fs_x("viewX.xyz", std::ios::out);
-	if (fs_x) {
-		for (int i = 0; i < x.dim1(); i++) {
-			for (int j = 0; j < x.dim2(); j++) {
-				fs_x << x[i][j] << " ";
-			}
-			fs_x << std::endl;
-		}
-		fs_x.close();
-	}
-	fstream fs_y("viewY.xyz", std::ios::out);
-	if (fs_y) {
-		for (int i = 0; i < y.dim1(); i++) {
-			for (int j = 0; j < y.dim2(); j++) {
-				fs_y << y[i][j] << " ";
-			}
-			fs_y << std::endl;
-		}
-		fs_y.close();
-	}
+	//fstream fs_x("viewX.xyz", std::ios::out);
+	//if (fs_x) {
+	//	for (int i = 0; i < x.dim1(); i++) {
+	//		for (int j = 0; j < x.dim2(); j++) {
+	//			fs_x << x[i][j] << " ";
+	//		}
+	//		fs_x << std::endl;
+	//	}
+	//	fs_x.close();
+	//}
+	//fstream fs_y("viewY.xyz", std::ios::out);
+	//if (fs_y) {
+	//	for (int i = 0; i < y.dim1(); i++) {
+	//		for (int j = 0; j < y.dim2(); j++) {
+	//			fs_y << y[i][j] << " ";
+	//		}
+	//		fs_y << std::endl;
+	//	}
+	//	fs_y.close();
+	//}
     
     update_transform_mat(x, y, lambda, w, A);
 
-	farr xn = warp_points(x, x, w, A);
+	//farr xn = warp_points(x, x, w, A);
 
-	fstream fs_xn("viewX_new.xyz", std::ios::out);
-	if (fs_xn) {
-		for (int i = 0; i < xn.dim1(); i++) {
-			for (int j = 0; j < xn.dim2(); j++) {
-				fs_xn << xn[i][j] << " ";
-			}
-			fs_xn << std::endl;
-		}
-		fs_xn.close();
-	}
+	//fstream fs_xn("viewX_new.xyz", std::ios::out);
+	//if (fs_xn) {
+	//	for (int i = 0; i < xn.dim1(); i++) {
+	//		for (int j = 0; j < xn.dim2(); j++) {
+	//			fs_xn << xn[i][j] << " ";
+	//		}
+	//		fs_xn << std::endl;
+	//	}
+	//	fs_xn.close();
+	//}
 
-	exit(0);
+	//exit(0);
 
     if (opts.affine_prefix) {
       xform xfout = xform(A[0][0], A[0][1], A[0][2], A[0][3],

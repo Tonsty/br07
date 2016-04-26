@@ -1035,7 +1035,7 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 	const vector<input_corr_vector> &icv, const vector<point> &targets, const vector<bool> &use_points, const vector<float> &confidence,
 	TriMesh *points_mesh, const vector<TriMesh::Face> &all_faces, pthread_mutex_t *mutex) {
 
-		write_view0_target0_xyz(opts, icv, targets, use_points);
+		//write_view0_target0_xyz(opts, icv, targets, use_points);
 
 		vector< vector<point_pair_vector> > ppvs;
 		icv2ppvs_ApproxiMultiTPS(opts, num_meshes, icv, use_points, ppvs);
