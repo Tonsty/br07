@@ -525,8 +525,8 @@ struct point_pair{
 
 typedef vector<point_pair> point_pair_vector;
 
-//The strategy for ApproxiMultiTPS
-void icv2ppvs_ApproxiMultiTPS(const opts_t &opts, const int &num_meshes, const vector<input_corr_vector> &icv, const vector<bool> &use_points,
+//The strategy for ApproxiMultiTPS_1
+void icv2ppvs_ApproxiMultiTPS_1(const opts_t &opts, const int &num_meshes, const vector<input_corr_vector> &icv, const vector<bool> &use_points,
 	vector< vector<point_pair_vector> > &ppvs) {
 
 		std::cout << "original : " << icv.size() << std::endl;
@@ -535,7 +535,7 @@ void icv2ppvs_ApproxiMultiTPS(const opts_t &opts, const int &num_meshes, const v
 
 		int unused = 0, unstable = 0, unallowed = 0;
 
-		//The strategy for ApproxiMultiTPS
+		//The strategy for ApproxiMultiTPS_1
 		for (int i = 0; i < icv.size(); i++) {
 			if(!use_points[i]){
 				unused++;
@@ -564,6 +564,77 @@ void icv2ppvs_ApproxiMultiTPS(const opts_t &opts, const int &num_meshes, const v
 			std::cout << i << ": ";
 			for (int j = 0; j < num_meshes; j++) {
 				std::cout << ppvs[i][j].size() << " ";
+			}
+			std::cout << std::endl;
+		}
+}
+
+//The strategy for ApproxiMultiTPS_2
+void icv2ppvs_ApproxiMultiTPS_2(const opts_t &opts, const int &num_meshes, const vector<int> &icv_num_for_each, const vector<input_corr_vector> &icv, const vector<bool> &use_points,
+	vector< vector<point_pair_vector> > &ppvs, vector< vector<point_pair_vector> > &ppvs2) {
+
+		std::cout << "original : " << icv.size() << std::endl;
+
+		ppvs.resize(num_meshes, vector<point_pair_vector>(num_meshes));
+		ppvs2.resize(num_meshes, vector<point_pair_vector>(num_meshes));
+
+		int unused = 0, unstable = 0, unallowed = 0;
+
+		//The second strategy
+		for (int i = 0, start =0; i < icv_num_for_each.size(); i++) {
+			for (int j = start; j - start < icv_num_for_each[i]; j++) {
+				if (!use_points[j]) {
+					unused++;
+					continue;
+				}
+				int mesh_index_x = i;
+				point x;
+				for (int k = 0; k < icv[j].size(); k++) {
+					if (icv[j][k].tgt == mesh_index_x) {
+						x = icv[j][k].p;
+						break;
+					}
+				}
+				bool flag = false;
+				for(int k = 0; k < icv[j].size(); k++) {
+					if(icv[j][k].tgt == mesh_index_x) continue;
+					if (icv[j][k].status == input_corr::STABLE) {
+						int mesh_index_y = icv[j][k].tgt;
+						point y = icv[j][k].p;
+						float dist = SQ(x[0] - y[0]) + SQ(x[1] - y[1]) + SQ(x[2] - y[2]);
+						if(dist < 500 ){
+							point_pair pp(x, y);
+							if(flag) ppvs[mesh_index_x][mesh_index_y].push_back(pp); 
+							else {
+								ppvs2[mesh_index_x][mesh_index_y].push_back(pp);
+								flag = true;
+							}
+						}
+						else unallowed ++;
+					}else unstable++;
+				}
+			}
+			start += icv_num_for_each[i];
+		}
+
+		std::cout << "unused : " << unused << std::endl;
+		std::cout << "unstable : " << unstable << std::endl;
+		std::cout << "unallowed : " << unallowed << std::endl;
+
+		std::cout << "ppvs = " << std::endl;
+		for (int i = 0; i < num_meshes; i++) {
+			std::cout << i << ": ";
+			for (int j = 0; j < num_meshes; j++) {
+				std::cout << ppvs[i][j].size() << " ";
+			}
+			std::cout << std::endl;
+		}
+
+		std::cout << "ppvs2 = " << std::endl;
+		for (int i = 0; i < num_meshes; i++) {
+			std::cout << i << ": ";
+			for (int j = 0; j < num_meshes; j++) {
+				std::cout << ppvs2[i][j].size() << " ";
 			}
 			std::cout << std::endl;
 		}
@@ -708,9 +779,9 @@ void icv2ppvs_3(const opts_t &opts, const int &num_meshes, const vector<input_co
 				}
 
 				if (stable_indices.size() >= 2) {
-					for (int j = 0; j < stable_indices.size()-1; j++) {
+					for (int j = 0; j < stable_indices.size(); j++) {
 						int first = stable_indices[j];
-						int second = stable_indices[j+1];
+						int second = stable_indices[(j+1)%stable_indices.size()];
 						int mesh_index_x = icv[i][first].tgt;
 						int mesh_index_y = icv[i][second].tgt;
 						point x = icv[i][first].p;
@@ -795,7 +866,7 @@ void icv2ppvs_4(const opts_t &opts, const int &num_meshes, const vector<input_co
 		}
 }
 
-void generate_alpha_beta_m_na_nb_total_num_corr_ApproxiMultiTPS(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs,
+void generate_alpha_beta_m_na_nb_total_num_corr_ApproxiMultiTPS_1(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs,
 	vector<int> &alpha, vector<int> &beta, vector<int> &m, vector<int> &na, vector<int> &nb, int &total_num_corr) {
 		
 	total_num_corr = 0;
@@ -814,8 +885,27 @@ void generate_alpha_beta_m_na_nb_total_num_corr_ApproxiMultiTPS(const opts_t &op
 	}
 }
 
-void generate_alpha_beta_m_na_nb_total_num_corr_1234(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs,
+void generate_alpha_beta_m_na_nb_total_num_corr_ApproxiMultiTPS_2(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs, const vector< vector<point_pair_vector> > &ppvs2,
 	vector<int> &alpha, vector<int> &beta, vector<int> &m, vector<int> &na, vector<int> &nb, int &total_num_corr) {
+
+		total_num_corr = 0;
+
+		for (int i = 0; i < num_meshes-1; i++) {
+			for (int j = i+1; j < num_meshes; j++) {
+				if (!ppvs[i][j].empty() || !ppvs[j][i].empty() || !ppvs2[i][j].empty() || !ppvs2[j][i].empty()) {
+					alpha.push_back(i);
+					beta.push_back(j);
+					na.push_back(ppvs[j][i].size() + ppvs2[i][j].size() + ppvs2[j][i].size());
+					nb.push_back(ppvs2[i][j].size() + ppvs2[j][i].size() + ppvs[i][j].size());
+					m.push_back(ppvs[i][j].size() + ppvs[j][i].size() + ppvs2[i][j].size() + ppvs2[j][i].size());
+					total_num_corr += m.back();
+				}
+			}
+		}
+}
+
+void generate_alpha_beta_m_na_nb_total_num_corr_1234(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs,
+	vector<int> &alpha, vector<int> &beta, vector<int> &m, int &total_num_corr) {
 
 		total_num_corr = 0;
 
@@ -839,7 +929,7 @@ void generate_alpha_beta_m_na_nb_total_num_corr_1234(const opts_t &opts, const i
 		}
 }
 
-void ppvs2XY_ApproxiMultiTPS(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs, const int &total_num_corr,
+void ppvs2XY_ApproxiMultiTPS_1(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs, const int &total_num_corr,
 	gmnr::PointSet3D &input_X, gmnr::PointSet3D &input_Y) {
 
 	input_X.resize(total_num_corr, 3);
@@ -875,6 +965,69 @@ void ppvs2XY_ApproxiMultiTPS(const opts_t &opts, const int &num_meshes, const ve
 			}
 		}
 	}
+}
+
+void ppvs2XY_ApproxiMultiTPS_2(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs, const vector< vector<point_pair_vector> > &ppvs2,const int &total_num_corr,
+	gmnr::PointSet3D &input_X, gmnr::PointSet3D &input_Y) {
+
+		input_X.resize(total_num_corr, 3);
+		input_Y.resize(total_num_corr, 3);
+
+		int current_num_corr = 0;
+
+		for (int i = 0; i < num_meshes-1; i++) {
+			for (int j = i+1; j < num_meshes; j++) {
+				if (!ppvs[i][j].empty() || !ppvs[j][i].empty() || !ppvs2[i][j].empty() || !ppvs2[j][i].empty()) {
+					for (int k = 0; k < ppvs[j][i].size(); k++) {
+						input_X(current_num_corr, 0) = ppvs[j][i][k].y[0];
+						input_X(current_num_corr, 1) = ppvs[j][i][k].y[1];
+						input_X(current_num_corr, 2) = ppvs[j][i][k].y[2];
+
+						input_Y(current_num_corr, 0) = ppvs[j][i][k].x[0];
+						input_Y(current_num_corr, 1) = ppvs[j][i][k].x[1];
+						input_Y(current_num_corr, 2) = ppvs[j][i][k].x[2];
+
+						current_num_corr++;
+					}
+
+					for (int k = 0; k < ppvs2[j][i].size(); k++) {
+						input_X(current_num_corr, 0) = ppvs2[j][i][k].y[0];
+						input_X(current_num_corr, 1) = ppvs2[j][i][k].y[1];
+						input_X(current_num_corr, 2) = ppvs2[j][i][k].y[2];
+
+						input_Y(current_num_corr, 0) = ppvs2[j][i][k].x[0];
+						input_Y(current_num_corr, 1) = ppvs2[j][i][k].x[1];
+						input_Y(current_num_corr, 2) = ppvs2[j][i][k].x[2];
+
+						current_num_corr++;
+					}
+
+					for (int k = 0; k < ppvs2[i][j].size(); k++) {
+						input_X(current_num_corr, 0) = ppvs2[i][j][k].x[0];
+						input_X(current_num_corr, 1) = ppvs2[i][j][k].x[1];
+						input_X(current_num_corr, 2) = ppvs2[i][j][k].x[2];
+
+						input_Y(current_num_corr, 0) = ppvs2[i][j][k].y[0];
+						input_Y(current_num_corr, 1) = ppvs2[i][j][k].y[1];
+						input_Y(current_num_corr, 2) = ppvs2[i][j][k].y[2];
+
+						current_num_corr++;
+					}
+
+					for (int k = 0; k < ppvs[i][j].size(); k++) {
+						input_X(current_num_corr, 0) = ppvs[i][j][k].x[0];
+						input_X(current_num_corr, 1) = ppvs[i][j][k].x[1];
+						input_X(current_num_corr, 2) = ppvs[i][j][k].x[2];
+
+						input_Y(current_num_corr, 0) = ppvs[i][j][k].y[0];
+						input_Y(current_num_corr, 1) = ppvs[i][j][k].y[1];
+						input_Y(current_num_corr, 2) = ppvs[i][j][k].y[2];
+
+						current_num_corr++;
+					}
+				}
+			}
+		}
 }
 
 void ppvs2XY_1234(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs, const int &total_num_corr,
@@ -1007,7 +1160,7 @@ void write_view0_target0_xyz(const opts_t &opts, const vector<input_corr_vector>
 	std::cout << "Unused size : "<< unused << std::endl;
 	std::cout << "Unstable size : "<< unstable << std::endl;
 
-	std::fstream fs_viewX("viewX2.xyz", std::ios::out);
+	std::fstream fs_viewX("debug/viewX2.xyz", std::ios::out);
 	if(fs_viewX) {
 		for(int p = 0; p < viewX.size(); p++) {
 			for (int q = 0; q < 3; q++) {
@@ -1017,7 +1170,7 @@ void write_view0_target0_xyz(const opts_t &opts, const vector<input_corr_vector>
 		}
 	}
 	fs_viewX.close();
-	std::fstream fs_viewY("viewY2.xyz", std::ios::out);
+	std::fstream fs_viewY("debug/viewY2.xyz", std::ios::out);
 	if(fs_viewY) {
 		for(int p = 0; p < viewY.size(); p++) {
 			for (int q = 0; q < 3; q++) {
@@ -1037,15 +1190,24 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 
 		//write_view0_target0_xyz(opts, icv, targets, use_points);
 
-		vector< vector<point_pair_vector> > ppvs;
-		icv2ppvs_ApproxiMultiTPS(opts, num_meshes, icv, use_points, ppvs);
+		vector< vector<point_pair_vector> > ppvs, ppvs2;
+		//icv2ppvs_ApproxiMultiTPS_1(opts, num_meshes, icv, use_points, ppvs);
+		icv2ppvs_ApproxiMultiTPS_2(opts, num_meshes, icv_num_for_each, icv, use_points, ppvs, ppvs2);
+		//icv2ppvs_1(opts, num_meshes, icv, use_points, ppvs);
+		//icv2ppvs_2(opts, num_meshes, icv_num_for_each, icv, use_points, ppvs);
+		//icv2ppvs_3(opts, num_meshes, icv, use_points, ppvs);
+		//icv2ppvs_4(opts, num_meshes, icv, use_points, ppvs);
 
 		vector<int> alpha, beta, m, na, nb;
 		int total_num_corr = 0;
-		generate_alpha_beta_m_na_nb_total_num_corr_ApproxiMultiTPS(opts, num_meshes, ppvs, alpha, beta, m, na, nb, total_num_corr);
+		//generate_alpha_beta_m_na_nb_total_num_corr_ApproxiMultiTPS_1(opts, num_meshes, ppvs, alpha, beta, m, na, nb, total_num_corr);
+		generate_alpha_beta_m_na_nb_total_num_corr_ApproxiMultiTPS_2(opts, num_meshes, ppvs, ppvs2, alpha, beta, m, na, nb, total_num_corr);
+		//generate_alpha_beta_m_na_nb_total_num_corr_1234(opts, num_meshes, ppvs, alpha, beta, m, total_num_corr);
 
 		gmnr::PointSet3D input_X, input_Y;
-		ppvs2XY_ApproxiMultiTPS(opts, num_meshes, ppvs, total_num_corr, input_X, input_Y);
+		//ppvs2XY_ApproxiMultiTPS(opts, num_meshes, ppvs, total_num_corr, input_X, input_Y);
+		ppvs2XY_ApproxiMultiTPS_2(opts, num_meshes, ppvs, ppvs2, total_num_corr, input_X, input_Y);
+		//ppvs2XY_1234(opts, num_meshes, ppvs, total_num_corr, input_X, input_Y);
 
 		write_cube_for_XY(opts, mesh_names, points_mesh, input_X, input_Y, m, alpha, beta);
 
@@ -1067,9 +1229,14 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 			//lambda[i] = opts.lambda * corr_for_each_view[i] * 1.0 / total_num;
 			lambda[i] = 0.00001;
 		}
+		
+		timestamp opt_start = now();
 
-		//gmnr::MultiTPS mtps(input_X, input_Y, m, alpha, beta, kappa, lambda, 10);
 		gmnr::ApproxiMultiTPS mtps(input_X, input_Y, m, alpha, beta, kappa, lambda, na, nb, 4);
+		//gmnr::MultiTPS mtps(input_X, input_Y, m, alpha, beta, kappa, lambda, 4);
+
+		float opt_time = now() - opt_start;
+		fprintf(stdout, "MultiTPS Optimization time: %f\n", opt_time);
 
 		for (int i = 0; i < num_meshes; i++) {
 			const char *mesh_name = mesh_names[i];
