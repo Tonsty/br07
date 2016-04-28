@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <utility>
 #include <iostream>
 #include <fstream>
+#include <unordered_map>
 
 #include <GMNR/MultiTPS.h>
 
@@ -517,9 +518,17 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
 struct point_pair{
 	point x;
 	point y;
+
+	point_pair() {}
+
 	point_pair(const point &x, const point &y) {
 		this->x = x;
 		this->y = y;
+	}
+
+	point_pair(const point_pair&copy) {
+		this->x = copy.x;
+		this->y = copy.y;
 	}
 };
 
@@ -866,6 +875,157 @@ void icv2ppvs_4(const opts_t &opts, const int &num_meshes, const vector<input_co
 		}
 }
 
+void boundbox(const vector<point> &points, 
+	point &min_point, point &max_point) {
+
+	min_point = points[0];
+	max_point = points[0];
+
+	for (int i = 0; i < points.size(); i++) {
+		min_point[0] = min_point[0] < points[i][0] ? min_point[0] : points[i][0];
+		min_point[1] = min_point[1] < points[i][1] ? min_point[1] : points[i][1];
+		min_point[2] = min_point[2] < points[i][2] ? min_point[2] : points[i][2];
+
+		max_point[0] = max_point[0] > points[i][0] ? max_point[0] : points[i][0];
+		max_point[1] = max_point[1] > points[i][1] ? max_point[1] : points[i][1];
+		max_point[2] = max_point[2] > points[i][2] ? max_point[2] : points[i][2];
+	}
+}
+
+struct Voxel_Key {
+	int index_x;
+	int index_y;
+	int index_z;
+	Voxel_Key(int ix, int iy, int iz) : index_x(ix), index_y(iy), index_z(iz) {}
+
+	bool operator == (const Voxel_Key &other) const {
+		return (index_x == other.index_x) && (index_y == other.index_y) && (index_z == other.index_z);		
+	}
+
+	operator size_t() const { return *((size_t*)this);}
+};
+
+struct Voxel_Value {
+	int point_index;
+	Voxel_Value(int pi) : point_index(pi) {}
+};
+
+void build_voxel_grid(const vector<point> &points, const float &voxel_size, const point &min_point, const point &max_point,
+	unordered_multimap<Voxel_Key, Voxel_Value> &voxel_grid) {
+
+	for (int i = 0; i < points.size(); i++) {
+		int index_x = (points[i][0] - min_point[0]) / voxel_size;
+		int index_y = (points[i][1] - min_point[1]) / voxel_size;
+		int index_z = (points[i][2] - min_point[2]) / voxel_size;
+
+		Voxel_Key key(index_x, index_y, index_z);
+		Voxel_Value value(i);
+
+		pair<Voxel_Key, Voxel_Value> kv_pair(key, value);
+		voxel_grid.insert(kv_pair);
+	}
+
+	min_point;
+}
+
+void voxel_based_filter_1234(const opts_t &opts, const int &num_meshes, vector< vector<point_pair_vector> > &ppvs) {
+	for (int i = 0; i < num_meshes-1; i++) {
+		for (int j = i+1; j < num_meshes; j++) {
+			if (!ppvs[i][j].empty()) {
+				vector<point> mid_points;
+				vector<float> distances;
+				for(int k = 0; k < ppvs[i][j].size(); k++) {
+					point mid_point = ppvs[i][j][k].x + ppvs[i][j][k].y;
+					mid_point *= 0.5f; 
+					mid_points.push_back(mid_point);
+					distances.push_back(dist(ppvs[i][j][k].x, ppvs[i][j][k].y));
+				}
+
+				vector<bool> valid(mid_points.size(), true);
+
+				point min_point, max_point;
+				boundbox(mid_points, min_point, max_point);
+
+				float voxel_size = sqrt(opts.min_target_dist2) * 1.0f;
+				vec voxel_unit(voxel_size, voxel_size, voxel_size);
+
+				for (int p_x = 0; p_x < 2; p_x++) {
+					for (int p_y = 0; p_y < 2; p_y++) {
+						for (int p_z = 0; p_z < 2; p_z++) {
+							point new_min_point = min_point - 5.0f * voxel_unit;
+							point new_max_point = max_point + 5.0f * voxel_unit;
+
+							new_min_point[0] += p_x * 0.5f * voxel_size;
+							new_min_point[1] += p_y * 0.5f * voxel_size;
+							new_min_point[2] += p_z * 0.5f * voxel_size;
+
+							new_max_point[0] += p_x * 0.5f * voxel_size;
+							new_max_point[1] += p_y * 0.5f * voxel_size;
+							new_max_point[2] += p_z * 0.5f * voxel_size;
+
+							unordered_multimap<Voxel_Key, Voxel_Value> voxel_grid;
+							build_voxel_grid(mid_points, voxel_size, new_min_point, new_max_point, voxel_grid);
+
+							unordered_multimap<Voxel_Key, Voxel_Value>::const_iterator iter1, iter2;
+							iter1 = voxel_grid.begin();
+							while(iter1 != voxel_grid.end()) {
+								int index1 = (*iter1).second.point_index;
+								if (valid[index1]) break;
+								iter1++;
+							}
+							if(iter1 == voxel_grid.end()) continue;
+							iter2 = iter1++;
+							while (iter2!=voxel_grid.end()) {
+								if ( (*iter1).first == (*iter2).first){
+									int index1 = (*iter1).second.point_index;
+									int index2 = (*iter2).second.point_index;
+									if(valid[index2]) {
+										if (distances[index1] > distances[index2]) {
+											valid[index1] = false;
+											iter1 = iter2;
+										}else valid[index2] = false;
+									}
+								} else {
+									iter1 = iter2;
+									while(iter1 != voxel_grid.end()) {
+										int index1 = (*iter1).second.point_index;
+										if (valid[index1]) break;
+										iter1++;
+									}
+									if(iter1 == voxel_grid.end()) break;
+									iter2 = iter1;
+								}
+								iter2++;
+							}
+						}
+					}
+				}
+				
+				int last = 0, current = 0;
+				while (current < ppvs[i][j].size()) {
+					if (valid[current]) {
+						ppvs[i][j][last] = ppvs[i][j][current];
+						last++;
+					}
+					current++;
+				}
+
+				ppvs[i][j].resize(last);
+			}
+		}
+	}
+
+	cout << "After voxel-based filter : " << endl;
+
+	for (int i = 0; i < num_meshes; i++) {
+		std::cout << i << ": ";
+		for (int j = 0; j < num_meshes; j++) {
+			std::cout << ppvs[i][j].size() << " ";
+		}
+		std::cout << std::endl;
+	}
+}
+
 void generate_alpha_beta_m_na_nb_total_num_corr_ApproxiMultiTPS_1(const opts_t &opts, const int &num_meshes, const vector< vector<point_pair_vector> > &ppvs,
 	vector<int> &alpha, vector<int> &beta, vector<int> &m, vector<int> &na, vector<int> &nb, int &total_num_corr) {
 		
@@ -1198,11 +1358,18 @@ void align_scan2(const opts_t &opts, const vector<char *> &mesh_names, const int
 		//icv2ppvs_3(opts, num_meshes, icv, use_points, ppvs);
 		//icv2ppvs_4(opts, num_meshes, icv, use_points, ppvs);
 
+		//voxel_based_filter_1234(opts, num_meshes, ppvs);
+
 		vector<int> alpha, beta, m, na, nb;
 		int total_num_corr = 0;
 		//generate_alpha_beta_m_na_nb_total_num_corr_ApproxiMultiTPS_1(opts, num_meshes, ppvs, alpha, beta, m, na, nb, total_num_corr);
 		generate_alpha_beta_m_na_nb_total_num_corr_ApproxiMultiTPS_2(opts, num_meshes, ppvs, ppvs2, alpha, beta, m, na, nb, total_num_corr);
 		//generate_alpha_beta_m_na_nb_total_num_corr_1234(opts, num_meshes, ppvs, alpha, beta, m, total_num_corr);
+
+		for (int i = 0; i < na.size(); i++){
+			na[i] /= 4;
+		    nb[i] /= 4;
+		}
 
 		gmnr::PointSet3D input_X, input_Y;
 		//ppvs2XY_ApproxiMultiTPS(opts, num_meshes, ppvs, total_num_corr, input_X, input_Y);
@@ -1709,8 +1876,8 @@ int main(int argc, char *argv[]) {
 #endif
 
 #if 1
-  for (int i = 0; i < rc.num_meshes; i++)
-	  prune_big_moving_points(opts.min_target_dist2, rc.corrs[i], rc.targets, rc.use_points);
+  //for (int i = 0; i < rc.num_meshes; i++)
+	 // prune_big_moving_points(opts.min_target_dist2, rc.corrs[i], rc.targets, rc.use_points);
 
   if (!opts.suppress_optimization) {
     for (int i = 0; i < 1; i++) move_points(rc.targets, rc.use_points, rc.errors, rc.springs, true);
