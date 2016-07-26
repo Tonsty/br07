@@ -118,7 +118,7 @@ struct opts_t {
       } else if (!strcmp(argv[i], "-kd")) {
         kd = atof(argv[++i]);
       } else if (!strcmp(argv[i], "-bbox")) {
-        bbox_list = fopen(argv[++i], "r");
+        bbox_list = fopen(argv[++i], "rb");
         if (!bbox_list) {
           fprintf(stderr, "Could not open bounding box cache file %s.\n", argv[i]);
           exit(-1);
@@ -366,6 +366,8 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Selected %d samples.\n", num_samples);
   }
 
+  fflush(stderr);
+
   if (samples.size() == 0) {
     fprintf(stderr, "There are no samples, aborting.\n");
     fprintf(opts.output, "0 %s\n", opts.tgt_name);
@@ -437,6 +439,7 @@ int main(int argc, char *argv[]) {
     }
 
     fprintf(stderr, "%s\n", fname);
+	fflush(stderr);
 
     if (opts.bbox_list) {
       // check bounding boxes for overlap info

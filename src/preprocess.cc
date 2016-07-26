@@ -195,7 +195,7 @@ int main(int argc, char *argv[])
     if (fstable || opts.type == opts_t::FULL || opts.type == opts_t::FACE || opts.type == opts_t::CURVE) {
       mesh->normals.clear();
       mesh->need_normals();
-      mesh->need_neighbors();
+	  mesh->need_neighbors();
       mesh->need_adjacentfaces();
       if (opts.dn > 0)
         diffuse_normals(mesh, opts.dn * mesh->feature_size());

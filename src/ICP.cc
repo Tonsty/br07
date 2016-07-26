@@ -37,7 +37,7 @@ using namespace std;
 
 #define MAX_ITERS 100
 #define MIN_PAIRS 25
-#define DESIRED_PAIRS 100
+#define DESIRED_PAIRS 500
 #define COMPAT_THRESH 0.9f
 #define CURVE_THRESH  0.99f // higher is more restrictive
 // #define CURVE_THRESH  0.0f // higher is more restrictive

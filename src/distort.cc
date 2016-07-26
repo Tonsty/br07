@@ -117,8 +117,8 @@ int main(int argc, char **argv) {
 
 	  float scale = 1.0f + k1 * r2 + k2 * r4 + k5 * r6;
 	  std::cout << "scale = " << scale << " shift = " << xg << ", " << yg << std::endl;
-	  float xk = 1.0f / scale * (xn - xg); // distorted x
-	  float yk = 1.0f / scale * (yn - yg); // distorted y
+	  float xk = scale * xn + xg; // distorted x
+	  float yk = scale * yn + yg; // distorted y
 
 	  zc = zc / ( 1.0f - zc * c0);
 	  xc = xk * zc;
