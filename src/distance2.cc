@@ -30,6 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using namespace std;
 
 
+#define  PI 3.14159265
+
 #if 0
 #define MAX_KD_DIST (10 * 10)
 #else
@@ -200,6 +202,11 @@ int main(int argc, char **argv) {
 
       // skip boundary points
       if (m->neighbors[j].size() != m->adjacentfaces[j].size()) continue;
+
+	  vec src_norm = m->normals[j];
+	  vec tgt_norm = mesh->normals[i];
+	  float ang = abs(angle(src_norm, tgt_norm));
+	 if (ang > PI * 0.25) continue;
 
       double d2 = dist2(mesh->vertices[i], p);
       double d = sqrt(d2);
