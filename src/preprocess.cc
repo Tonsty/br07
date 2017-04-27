@@ -43,6 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <fstream>
 
 #include <tnt_array2d.h>
+#define PCL_NO_PRECOMPILE
+#include <pcl/io/pcd_io.h>
+#include <pcl/features/boundary.h>
+typedef pcl::PointCloud<pcl::Boundary> Boundaries;
 
 #include "EdgeMesh.h"
 #include "TriMesh_algo.h"
@@ -161,6 +165,8 @@ int main(int argc, char *argv[])
 
     srand48(0);
     EdgeMesh *mesh = EdgeMesh::read(fname); putc('\n', stderr);
+	Boundaries::Ptr boundaries(new Boundaries);
+	pcl::io::loadPCDFile((string(fname).substr(0, strlen(fname)-4)+".bd").c_str() , *boundaries);
 
     if (opts.read_xf) {
       char xfname[1024];
@@ -241,6 +247,7 @@ int main(int argc, char *argv[])
       assert(mesh->normals.size() == vsize);
       //fwrite(opts.type == opts_t::FACE ? face_header : (opts.type == opts_t::CURVE ? curv_header : vert_header),
       //       sizeof(char), 8, premesh);
+	  fwrite(vert_header, sizeof(char), 8, premesh);
       fwrite(&vsize, sizeof(int), 1, premesh);
       if (opts.type == opts_t::FACE) fwrite(&fsize, sizeof(int), 1, premesh);
       fwrite(&mesh->vertices[0], sizeof(float), 3 * vsize, premesh);
@@ -262,7 +269,8 @@ int main(int argc, char *argv[])
       int *isedge = new int[(vsize + 31) / 32];
       for (unsigned int i = 0; i < (vsize + 31) / 32; isedge[i++] = 0);
       for (unsigned int i = 0; i < vsize; i++) {
-        int bit = (mesh->neighbors[i].size() != mesh->adjacentfaces[i].size());
+        //int bit = (mesh->neighbors[i].size() != mesh->adjacentfaces[i].size());
+		int bit = ((*boundaries)[i].boundary_point!=0);
         isedge[i / 32] |= (bit << (i % 32));
       }
       fwrite(isedge, 4, (vsize + 31) / 32, premesh);

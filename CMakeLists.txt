@@ -21,7 +21,7 @@ LINK_DIRECTORIES(
 
 ADD_DEFINITIONS(-DLIBMATH_DYNAMIC -DLIBTPS_DYNAMIC -DLIBMULTITPS_DYNAMIC)
 
-find_package(PCL 1.8 REQUIRED COMPONENTS common io)
+find_package(PCL 1.8 REQUIRED COMPONENTS common io filters)
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
@@ -108,7 +108,7 @@ ADD_EXECUTABLE(preprocess
 					./src/preprocess.cc
 					./src/ICP.cc
 					./src/EdgeMesh.cc)
-TARGET_LINK_LIBRARIES(preprocess debug trimeshd optimized trimesh)
+TARGET_LINK_LIBRARIES(preprocess debug trimeshd optimized trimesh ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_FILTERS_LIBRARIES})
 
 ADD_EXECUTABLE(pre_to_ply
 					./include/EdgeMesh.h
