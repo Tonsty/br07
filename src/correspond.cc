@@ -304,7 +304,7 @@ static EdgeMesh *read_mesh(char *name, bool read_xf) {
 
   mesh->need_bbox();
   mesh->need_edges();
-  mesh->need_curvatures();
+  //mesh->need_curvatures();
 
   return mesh;
 }

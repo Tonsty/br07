@@ -296,11 +296,11 @@ static void select_and_match_cdf(ICP_struct &m0, ICP_struct &m1, float incr, flo
     vec   n = xf01r * m0.m->normals[i];
 
     // Do the matching
-    // NormCompat nc(n, COMPAT_THRESH, m1.m);
-    CurveAndNormCompat cc(m0.m->curv1[i], m0.m->curv2[i], CURVE_THRESH, n, COMPAT_THRESH, m1.m);
+    NormCompat nc(n, COMPAT_THRESH, m1.m);
+    //CurveAndNormCompat cc(m0.m->curv1[i], m0.m->curv2[i], CURVE_THRESH, n, COMPAT_THRESH, m1.m);
 
-    // const float *match = kd2->closest_to_pt(p, maxdist2, &nc);
-    const float *match = m1.kd->closest_to_pt(p, maxdist2, &cc);
+    const float *match = m1.kd->closest_to_pt(p, maxdist2, &nc);
+    //const float *match = m1.kd->closest_to_pt(p, maxdist2, &cc);
     if (!match) continue;
     int imatch = (match - (const float *) &(m1.m->vertices[0][0])) / 3;
     if (edge(m1.m, imatch)) continue;
@@ -877,7 +877,7 @@ extern float ICP(ICP_struct &m0, ICP_struct &m1, float &stability, float &max_st
   for (int i = 0; i < 2; i++) {
     nv[i] = m[i]->m->vertices.size();
     m[i]->m->need_normals();
-    m[i]->m->need_curvatures();
+    //m[i]->m->need_curvatures();
     assert(m[i]->m->isedge.size == (int) nv[i]);
     // m[i]->m->need_edges();
     // m[i]->m->need_neighbors();
@@ -1014,18 +1014,23 @@ void stable_sample(EdgeMesh *m, int npts, vector<int> &points) {
   m->need_normals();
   int nv = m->vertices.size();
 
-  // Sample some points randomly
-  vector<PtPair> p;
-  for (int i = 0; i < DESIRED_PAIRS; i++) {
-    int ind = int(drand48() * nv);
-    p.push_back(PtPair(m->vertices[ind], m->vertices[ind],
-                       m->normals[ind],  m->normals[ind]));
-  }
 
-  // Compute covariance matrix
+  vector<PtPair> p;
   float evec[6][6], eval[6], b[6], scale, err;
   point centroid;
-  compute_ICPmatrix(p, evec, eval, b, centroid, scale, err);
+
+  do {
+	  p.clear();
+	  // Sample some points randomly
+	  for (int i = 0; i < DESIRED_PAIRS; i++) {
+		  int ind = int(drand48() * nv);
+		  p.push_back(PtPair(m->vertices[ind], m->vertices[ind],
+			  m->normals[ind],  m->normals[ind]));
+	  }
+	  // Compute covariance matrix
+	  compute_ICPmatrix(p, evec, eval, b, centroid, scale, err);
+  }while(eval[0] != eval[0]);
+
 
   // Compute (clamped) inverse of covariance matrix
   float Cinv[6][6], einv[6];

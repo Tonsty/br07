@@ -43,8 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "rand48.h"
 #include <vector>
 
-#include <pcl/io/pcd_io.h>
-
 using namespace std;
 
 

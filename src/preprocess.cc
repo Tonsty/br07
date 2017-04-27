@@ -51,6 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using namespace std;
 
+#define isnan(x) (!(x==x))
+
 // process command-line options for preprocess
 struct opts_t {
   bool read_xf;
@@ -193,18 +195,18 @@ int main(int argc, char *argv[])
     // fur:   normals = 1, curve = 1
 
     if (fstable || opts.type == opts_t::FULL || opts.type == opts_t::FACE || opts.type == opts_t::CURVE) {
-      mesh->normals.clear();
-      mesh->need_normals();
-	  mesh->need_neighbors();
-      mesh->need_adjacentfaces();
-      if (opts.dn > 0)
-        diffuse_normals(mesh, opts.dn * mesh->feature_size());
+    //   mesh->normals.clear();
+    //   mesh->need_normals();
+    //	mesh->need_neighbors();
+    //   mesh->need_adjacentfaces();
+    //   if (opts.dn > 0)
+    //     diffuse_normals(mesh, opts.dn * mesh->feature_size());
     }
 
     if (opts.type == opts_t::CURVE) {
-      mesh->need_curvatures();
-      if (opts.dc > 0)
-        diffuse_curv(mesh, opts.dc * mesh->feature_size());
+      //mesh->need_curvatures();
+      //if (opts.dc > 0)
+      //  diffuse_curv(mesh, opts.dc * mesh->feature_size());
     }
 
     if (fstable) {
@@ -237,20 +239,25 @@ int main(int argc, char *argv[])
       unsigned int vsize = mesh->vertices.size();
       unsigned int fsize = mesh->faces.size();
       assert(mesh->normals.size() == vsize);
-      fwrite(opts.type == opts_t::FACE ? face_header : (opts.type == opts_t::CURVE ? curv_header : vert_header),
-             sizeof(char), 8, premesh);
+      //fwrite(opts.type == opts_t::FACE ? face_header : (opts.type == opts_t::CURVE ? curv_header : vert_header),
+      //       sizeof(char), 8, premesh);
       fwrite(&vsize, sizeof(int), 1, premesh);
       if (opts.type == opts_t::FACE) fwrite(&fsize, sizeof(int), 1, premesh);
       fwrite(&mesh->vertices[0], sizeof(float), 3 * vsize, premesh);
+
+	  assert(!isnan(mesh->normals[0]));
+	  assert(!isnan(mesh->normals[1]));
+	  assert(!isnan(mesh->normals[2]));
+
       fwrite(&mesh->normals[0],  sizeof(float), 3 * vsize, premesh);
 
-      if (opts.type == opts_t::CURVE) {
-        // just write mean curvature, not principal curvatures
-        for (unsigned int i = 0; i < vsize; i++) {
-          float c = 0.5f * (mesh->curv1[i] + mesh->curv2[i]);
-          fwrite(&c, sizeof(float), 1, premesh);
-        }
-      }
+      //if (opts.type == opts_t::CURVE) {
+      //  // just write mean curvature, not principal curvatures
+      //  for (unsigned int i = 0; i < vsize; i++) {
+      //    float c = 0.5f * (mesh->curv1[i] + mesh->curv2[i]);
+      //    fwrite(&c, sizeof(float), 1, premesh);
+      //  }
+      //}
 
       int *isedge = new int[(vsize + 31) / 32];
       for (unsigned int i = 0; i < (vsize + 31) / 32; isedge[i++] = 0);
