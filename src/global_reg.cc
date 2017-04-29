@@ -436,12 +436,12 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
   farr verts, norms;
   if (mesh) {
     verts = farr(mesh->vertices.size(), 3);
-	norms = farr(mesh->normals.size(), 3);
+	//norms = farr(mesh->normals.size(), 3);
     for (unsigned int j = 0; j < mesh->vertices.size(); j++) {
       point p = xfin * mesh->vertices[j];
-	  point n = p + 0.001f * mesh->normals[j];
+	  //point n = p + 0.0001f * mesh->normals[j];
       for (int k = 0; k < 3; k++) verts[j][k] =  p[k];
-	  for (int k = 0; k < 3; k++) norms[j][k] =  n[k];
+	  //for (int k = 0; k < 3; k++) norms[j][k] =  n[k];
     }
   }
 
@@ -548,14 +548,14 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
         mesh->vertices[j][1] = tmp_x[j][1];
         mesh->vertices[j][2] = tmp_x[j][2];
 
-		mesh->normals[j][0] = tmp_n[j][0] - tmp_x[j][0];
-		mesh->normals[j][1] = tmp_n[j][1] - tmp_x[j][1];
-		mesh->normals[j][2] = tmp_n[j][2] - tmp_x[j][2];
+		//mesh->normals[j][0] = tmp_n[j][0] - tmp_x[j][0];
+		//mesh->normals[j][1] = tmp_n[j][1] - tmp_x[j][1];
+		//mesh->normals[j][2] = tmp_n[j][2] - tmp_x[j][2];
 
-		float n_len = sqrtf(mesh->normals[j][0]*mesh->normals[j][0] + mesh->normals[j][1]*mesh->normals[j][1] + mesh->normals[j][2]*mesh->normals[j][2]);
-		mesh->normals[j][0]/=n_len;
-		mesh->normals[j][1]/=n_len;
-		mesh->normals[j][2]/=n_len;
+		//float n_len = sqrtf(mesh->normals[j][0]*mesh->normals[j][0] + mesh->normals[j][1]*mesh->normals[j][1] + mesh->normals[j][2]*mesh->normals[j][2]);
+		//mesh->normals[j][0]/=n_len;
+		//mesh->normals[j][1]/=n_len;
+		//mesh->normals[j][2]/=n_len;
       }
 
 	   //fprintf(stdout, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
