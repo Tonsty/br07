@@ -319,7 +319,7 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
 
   if (opts.nonrigid_prefix || !opts.write_xf) {
     mesh = TriMesh::read(mesh_name);
-    mesh->normals.clear();
+    //mesh->normals.clear();
     assert(mesh);
   }
 
@@ -433,12 +433,15 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
 
   // make a backup of the mesh vertices, because the
   // various warps will clobber them
-  farr verts;
+  farr verts, norms;
   if (mesh) {
     verts = farr(mesh->vertices.size(), 3);
+	norms = farr(mesh->normals.size(), 3);
     for (unsigned int j = 0; j < mesh->vertices.size(); j++) {
       point p = xfin * mesh->vertices[j];
+	  point n = p + 0.001f * mesh->normals[j];
       for (int k = 0; k < 3; k++) verts[j][k] =  p[k];
+	  for (int k = 0; k < 3; k++) norms[j][k] =  n[k];
     }
   }
 
@@ -538,12 +541,24 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
 
     if (opts.nonrigid_prefix) {
       farr tmp_x = warp_points(verts, x, w, A);
+	  farr tmp_n = warp_points(norms, x, w, A);
 
       for (unsigned int j = 0; j < mesh->vertices.size(); j++) {
         mesh->vertices[j][0] = tmp_x[j][0];
         mesh->vertices[j][1] = tmp_x[j][1];
         mesh->vertices[j][2] = tmp_x[j][2];
+
+		mesh->normals[j][0] = tmp_n[j][0] - tmp_x[j][0];
+		mesh->normals[j][1] = tmp_n[j][1] - tmp_x[j][1];
+		mesh->normals[j][2] = tmp_n[j][2] - tmp_x[j][2];
+
+		float n_len = sqrtf(mesh->normals[j][0]*mesh->normals[j][0] + mesh->normals[j][1]*mesh->normals[j][1] + mesh->normals[j][2]*mesh->normals[j][2]);
+		mesh->normals[j][0]/=n_len;
+		mesh->normals[j][1]/=n_len;
+		mesh->normals[j][2]/=n_len;
       }
+
+	   //fprintf(stdout, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
 
       sprintf(out_name, "%s%s", opts.nonrigid_prefix, get_mesh_name(mesh_name));
       mesh->write(out_name);
