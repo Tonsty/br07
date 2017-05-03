@@ -541,7 +541,7 @@ void align_scan(const opts_t &opts, const char *mesh_name, const corr_vector &co
 
     if (opts.nonrigid_prefix) {
       farr tmp_x = warp_points(verts, x, w, A);
-	  farr tmp_n = warp_points(norms, x, w, A);
+	  //farr tmp_n = warp_points(norms, x, w, A);
 
       for (unsigned int j = 0; j < mesh->vertices.size(); j++) {
         mesh->vertices[j][0] = tmp_x[j][0];
